@@ -1,0 +1,413 @@
+<!-- hero-embroidery.html — Daith hero exploration: "Daith" rendered as HYPER-realistic raised satin-stitch embroidery, drawn procedurally on canvas. The real Daith glyphs are rasterised; a distance-field flow (smoothed in double-angle orientation space) steers thousands of discrete, pre-shaded thread sprites that follow each stroke and fan around curves; a dome-shade map lifts the floss into 3D; it sits in woven linen with a contact shadow, and a cursor-following sheen makes the threads turn over in the light. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Daith — Embroidered</title>
+<style>
+	@font-face {
+		font-family: "Daith";
+		src: url("./DaithVF.woff2") format("woff2");
+		font-weight: 100 900; font-display: block;
+	}
+	* { box-sizing: border-box; margin: 0; padding: 0; }
+	html, body { height: 100%; background: #08080a; }
+	body { color: #cfcabb; font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+	.stage { position: relative; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; overflow: hidden;
+		background: radial-gradient(130% 100% at 50% 42%, #161519 0%, #0b0b0d 50%, #050506 100%); }
+	.wrap { position: relative; width: min(95vw, 1240px); }
+	canvas { display: block; width: 100%; height: auto; }
+	.bg { position: relative; }
+	.fx { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; }
+	.hint { position: absolute; top: clamp(18px, 4vh, 40px); left: 0; right: 0; text-align: center; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #8a8477; }
+	.caption { position: absolute; left: 0; right: 0; bottom: clamp(20px, 5vh, 56px); text-align: center; font-size: clamp(11px, 1.1vw, 13px); letter-spacing: 0.22em; text-transform: uppercase; color: #948e80; }
+	.caption b { color: #b3ad9c; } .caption .face { color: #c7c1b0; font-weight: 600; }
+	.loading { position: absolute; inset: 0; display: grid; place-items: center; color: #8a8a8a; letter-spacing: 0.2em; text-transform: uppercase; font-size: 12px; }
+	.caret { position: absolute; width: 3px; background: rgba(245,240,228,0.9); box-shadow: 0 0 7px rgba(255,250,238,0.55); border-radius: 1px; pointer-events: none; animation: blink 1.05s steps(1) infinite; }
+	@keyframes blink { 0%,50% { opacity: 1; } 50.01%,100% { opacity: 0; } }
+	/* keyboard focus indicator on the editable surface */
+	.stage:focus-visible { outline: 2px solid rgba(245,240,228,0.55); outline-offset: -3px; }
+	/* screen-reader-only live region */
+	.vh { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+	@media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
+</style>
+</head>
+<body>
+	<main class="stage" id="stage" tabindex="0" role="textbox" aria-label="Type a word to embroider in the Daith typeface. Backspace to unpick, Enter to replay.">
+		<p class="vh" id="live" aria-live="polite"></p>
+		<p class="hint">Type to embroider · Backspace to unpick · Enter to replay · move the cursor for sheen</p>
+		<div class="wrap" id="wrap">
+			<canvas class="bg" id="bg"></canvas>
+			<canvas class="fx" id="fx"></canvas>
+			<div class="loading" id="loading">Stitching…</div>
+			<span class="caret" id="caret" aria-hidden="true"></span>
+		</div>
+		<p class="caption"><span class="face">Daith</span> &nbsp;·&nbsp; satin-stitch specimen</p>
+	</main>
+
+<script>
+// ============================================================================
+//  Procedural satin embroidery — discrete shaded thread sprites on a flow field
+// ============================================================================
+let WORD = "Daith";
+let FS = 0, ANCHOR_X = 0;     // fixed font size + left anchor so typed letters don't reflow
+const wrap = document.getElementById('wrap');
+const bgC  = document.getElementById('bg');
+const fxC  = document.getElementById('fx');
+const loading = document.getElementById('loading');
+const live = document.getElementById('live');
+const REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+let W, H;
+function computeSize() {
+	const cssW = Math.min(window.innerWidth * 0.95, 1240);
+	const cssH = Math.round(cssW * 0.46);
+	let scale = Math.min(window.devicePixelRatio || 1, 1.7);
+	while (cssW * scale * cssH * scale > 900000 && scale > 0.55) scale -= 0.1;   // lower res → snappier per-keystroke rebuild
+	W = Math.round(cssW * scale); H = Math.round(cssH * scale);
+	for (const c of [bgC, fxC]) { c.width = W; c.height = H; c.style.height = cssH + 'px'; }
+	wrap.style.height = cssH + 'px';
+}
+
+// noise --------------------------------------------------------------------
+function hash2(x, y) { let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
+function vnoise(x, y) {
+	const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+	const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+	const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1);
+	return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+
+// EDT ----------------------------------------------------------------------
+const INF = 1e20;
+function edt1d(f, n, d, v, z) {
+	let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+	for (let q = 1; q < n; q++) {
+		let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+		while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+		k++; v[k] = q; z[k] = s; z[k + 1] = INF;
+	}
+	k = 0;
+	for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
+}
+function distanceInside(mask, W, H) {
+	const grid = new Float64Array(W * H);
+	for (let i = 0; i < W * H; i++) grid[i] = mask[i] ? INF : 0;
+	const md = Math.max(W, H);
+	const f = new Float64Array(md), d = new Float64Array(md), v = new Int32Array(md), z = new Float64Array(md + 1);
+	for (let x = 0; x < W; x++) { for (let y = 0; y < H; y++) f[y] = grid[y * W + x]; edt1d(f, H, d, v, z); for (let y = 0; y < H; y++) grid[y * W + x] = d[y]; }
+	for (let y = 0; y < H; y++) { for (let x = 0; x < W; x++) f[x] = grid[y * W + x]; edt1d(f, W, d, v, z); for (let x = 0; x < W; x++) grid[y * W + x] = d[x]; }
+	const out = new Float32Array(W * H);
+	for (let i = 0; i < W * H; i++) out[i] = Math.sqrt(grid[i]);
+	return out;
+}
+
+// box blur -----------------------------------------------------------------
+function boxBlur(src, W, H, R, iters) {
+	let a = Float32Array.from(src), b = new Float32Array(W * H);
+	const inv = 1 / (2 * R + 1);
+	const cl = (v, m) => v < 0 ? 0 : (v > m ? m : v);
+	for (let it = 0; it < iters; it++) {
+		for (let y = 0; y < H; y++) {
+			let row = y * W, sum = 0;
+			for (let x = -R; x <= R; x++) sum += a[row + cl(x, W - 1)];
+			for (let x = 0; x < W; x++) { b[row + x] = sum * inv; sum += a[row + cl(x + R + 1, W - 1)] - a[row + cl(x - R, W - 1)]; }
+		}
+		for (let x = 0; x < W; x++) {
+			let sum = 0;
+			for (let y = -R; y <= R; y++) sum += b[cl(y, H - 1) * W + x];
+			for (let y = 0; y < H; y++) { a[y * W + x] = sum * inv; sum += b[cl(y + R + 1, H - 1) * W + x] - b[cl(y - R, H - 1) * W + x]; }
+		}
+	}
+	return a;
+}
+
+// ---- thread sprite (pre-shaded), in N brightness variants ------------------
+let SPRITES = [], SPRITE_W, SPRITE_H, PITCH;
+function buildSprites() {
+	const L = Math.max(7, PITCH * 2.5);   // thread length (across the stroke)
+	const Wd = Math.max(3.2, PITCH * 1.3); // thread width
+	SPRITE_W = Math.ceil(L) + 2; SPRITE_H = Math.ceil(Wd) + 2;
+	SPRITES = [];
+	for (let k = 0; k < 20; k++) {
+		const b = 0.34 + (k / 19) * 0.82;           // brightness level (20 buckets → less banding)
+		const cv = document.createElement('canvas'); cv.width = SPRITE_W; cv.height = SPRITE_H;
+		const c = cv.getContext('2d');
+		const cx = SPRITE_W / 2, cy = SPRITE_H / 2;
+		// rounded-tube cross-section (vertical gradient across the width)
+		const g = c.createLinearGradient(0, cy - Wd / 2, 0, cy + Wd / 2);
+		const col = (r, gn, bl, a) => `rgba(${Math.round(r * b)},${Math.round(gn * b)},${Math.round(bl * b)},${a})`;
+		g.addColorStop(0.00, col(120, 114, 102, 0));
+		g.addColorStop(0.16, col(150, 144, 130, 1));
+		g.addColorStop(0.50, col(255, 251, 243, 1));
+		g.addColorStop(0.84, col(150, 144, 130, 1));
+		g.addColorStop(1.00, col(120, 114, 102, 0));
+		c.fillStyle = g;
+		// stadium body
+		c.beginPath();
+		const r = Wd / 2;
+		c.moveTo(cx - L / 2 + r, cy - r);
+		c.lineTo(cx + L / 2 - r, cy - r);
+		c.arc(cx + L / 2 - r, cy, r, -Math.PI / 2, Math.PI / 2);
+		c.lineTo(cx - L / 2 + r, cy + r);
+		c.arc(cx - L / 2 + r, cy, r, Math.PI / 2, -Math.PI / 2);
+		c.closePath();
+		c.fill();
+		// soft fade at the two ends so neighbours blend along the thread
+		c.globalCompositeOperation = 'destination-in';
+		const ge = c.createLinearGradient(cx - L / 2, 0, cx + L / 2, 0);
+		ge.addColorStop(0, 'rgba(0,0,0,0)'); ge.addColorStop(0.22, 'rgba(0,0,0,1)');
+		ge.addColorStop(0.78, 'rgba(0,0,0,1)'); ge.addColorStop(1, 'rgba(0,0,0,0)');
+		c.fillStyle = ge; c.fillRect(0, 0, SPRITE_W, SPRITE_H);
+		SPRITES.push(cv);
+	}
+}
+
+let MASK, SHADE, EX, EY, MASKCV, SHADOWCV;
+function build() {
+	// 1. rasterise Daith (into the reused OFFCV scratch)
+	const o = OFFCTX;
+	o.clearRect(0, 0, W, H);
+	o.fillStyle = '#fff'; o.textAlign = 'left'; o.textBaseline = 'middle';
+	o.font = `680 ${FS}px "Daith", Georgia, serif`;
+	o.fillText(WORD, ANCHOR_X, H * 0.5);
+	const img = o.getImageData(0, 0, W, H).data;
+
+	// 2. frayed mask
+	const mask = new Uint8Array(W * H);
+	for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+		const i = y * W + x, a = img[i * 4 + 3] / 255;
+		const n = vnoise(x * 0.5, y * 0.5) * 0.22 + vnoise(x * 1.8, y * 1.8) * 0.10;
+		mask[i] = a > (0.5 + (n - 0.16)) ? 1 : 0;
+	}
+	MASK = mask;
+
+	// 3. distance + smoothed
+	const dist = distanceInside(mask, W, H);
+	const distS = new Float32Array(W * H);
+	for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+		const i = y * W + x;
+		distS[i] = (dist[i] * 4 + dist[i - 1] + dist[i + 1] + dist[i - W] + dist[i + W]) / 8;
+	}
+
+	// 4. orientation field, smoothed in double-angle space
+	const C2 = new Float32Array(W * H), S2 = new Float32Array(W * H);
+	const gxF = new Float32Array(W * H), gyF = new Float32Array(W * H);
+	for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+		const i = y * W + x; if (!mask[i]) continue;
+		const gx = (distS[i + 1] - distS[i - 1]) * 0.5, gy = (distS[i + W] - distS[i - W]) * 0.5;
+		gxF[i] = gx; gyF[i] = gy; C2[i] = gx * gx - gy * gy; S2[i] = 2 * gx * gy;
+	}
+	const R = Math.max(7, Math.round(H * 0.05));
+	const C2b = boxBlur(C2, W, H, R, 2), S2b = boxBlur(S2, W, H, R, 2);
+	EX = new Float32Array(W * H); EY = new Float32Array(W * H);
+	for (let i = 0; i < W * H; i++) { if (!mask[i]) continue; const th = 0.5 * Math.atan2(S2b[i], C2b[i]); EX[i] = Math.cos(th); EY[i] = Math.sin(th); }
+
+	// 5. dome-shade map (raised 3D, fixed top-left light + edge AO)
+	const PAD = Math.max(9, H * 0.04);
+	const shade = new Float32Array(W * H);
+	const Lx = -0.45, Ly = -0.62, Lz = 0.64;
+	for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+		const i = y * W + x; if (!mask[i]) continue;
+		let gx = gxF[i], gy = gyF[i]; const gl = Math.hypot(gx, gy) || 1; gx /= gl; gy /= gl;
+		const dd = distS[i]; const domeSlope = (1 - Math.min(dd / PAD, 1)) * 1.25;
+		let nx = -gx * domeSlope, ny = -gy * domeSlope, nz = 1.5; const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
+		let dif = nx * Lx + ny * Ly + nz * Lz; if (dif < 0) dif = 0;
+		const ao = Math.min(1, 0.45 + 0.55 * Math.min(dd / (PAD * 0.7), 1));
+		shade[i] = Math.min(1.12, (0.5 + 0.75 * dif) * ao);
+	}
+	SHADE = shade;
+
+	// solid mask canvas (white — for cursor sheen clipping)
+	MASKCV = document.createElement('canvas'); MASKCV.width = W; MASKCV.height = H;
+	const mc = MASKCV.getContext('2d'); const md = mc.createImageData(W, H);
+	// dark shadow canvas (black with mask alpha — for the contact shadow / seat)
+	SHADOWCV = document.createElement('canvas'); SHADOWCV.width = W; SHADOWCV.height = H;
+	const sc = SHADOWCV.getContext('2d'); const sdd = sc.createImageData(W, H);
+	for (let i = 0; i < W * H; i++) if (mask[i]) {
+		md.data[i * 4] = 255; md.data[i * 4 + 1] = 255; md.data[i * 4 + 2] = 255; md.data[i * 4 + 3] = 255;
+		sdd.data[i * 4 + 3] = 255;   // black, opaque
+	}
+	mc.putImageData(md, 0, 0);
+	sc.putImageData(sdd, 0, 0);
+}
+
+// Size-dependent scratch: the woven linen is STATIC, so bake it once into FABRIC_CV
+// (was re-derived via getImageData/per-pixel loop/putImageData on every keystroke).
+// OFFCV is a reused glyph-raster scratch surface.
+let FABRIC_CV = null, OFFCV = null, OFFCTX = null;
+function allocForSize() {
+	FABRIC_CV = document.createElement('canvas'); FABRIC_CV.width = W; FABRIC_CV.height = H;
+	const c = FABRIC_CV.getContext('2d', { willReadFrequently: true });
+	const g = c.createRadialGradient(W * 0.5, H * 0.4, 0, W * 0.5, H * 0.5, W * 0.72);
+	g.addColorStop(0, '#161519'); g.addColorStop(1, '#08080a');
+	c.fillStyle = g; c.fillRect(0, 0, W, H);
+	const img = c.getImageData(0, 0, W, H), d = img.data;
+	for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+		const i = (y * W + x) * 4;
+		const warp = Math.sin(x * 1.9) * 0.5 + 0.5, weft = Math.sin(y * 1.9) * 0.5 + 0.5;
+		const v = (warp * weft) * 9 - 4.5 + (vnoise(x * 0.18, y * 0.18) - 0.5) * 15;
+		d[i] = Math.max(0, Math.min(255, d[i] + v)); d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + v)); d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + v * 1.1));
+	}
+	c.putImageData(img, 0, 0);
+	OFFCV = document.createElement('canvas'); OFFCV.width = W; OFFCV.height = H;
+	OFFCTX = OFFCV.getContext('2d', { willReadFrequently: true });
+}
+
+// ---- stitch list (sorted by x only for leftX/rightX bounds; reveal order is the BFS below) ----
+let STITCHES = [], STEP_G = 3;
+function buildStitchList() {
+	const STEP = Math.max(1.6, PITCH * 0.6), list = []; STEP_G = STEP;
+	for (let y = 0; y < H; y += STEP) for (let x = 0; x < W; x += STEP) {
+		const jx = (hash2(Math.floor(x), Math.floor(y)) - 0.5) * STEP * 0.9;
+		const jy = (hash2(Math.floor(y), Math.floor(x)) - 0.5) * STEP * 0.9;
+		const px = Math.round(x + jx), py = Math.round(y + jy);
+		if (px < 1 || py < 1 || px >= W - 1 || py >= H - 1) continue;
+		const i = py * W + px; if (!MASK[i]) continue;
+		const ang = Math.atan2(EY[i], EX[i]);
+		const jit = 0.86 + hash2(px * 7, py * 13) * 0.18;
+		let b = SHADE[i] * jit; b = b < 0 ? 0 : (b > 1.12 ? 1.12 : b);
+		list.push({ x: px, y: py, ang, idx: Math.min(19, Math.max(0, Math.round((b / 1.12) * 19))) });
+	}
+	list.sort((a, b) => a.x - b.x);              // for leftX/rightX bounds
+	STITCHES = list;
+}
+function drawStitch(c, s) { c.save(); c.translate(s.x, s.y); c.rotate(s.ang); c.drawImage(SPRITES[s.idx], -SPRITE_W / 2, -SPRITE_H / 2); c.restore(); }
+function drawAll() { const c = bgC.getContext('2d'); for (const s of STITCHES) drawStitch(c, s); }
+function rightX() { return STITCHES.length ? STITCHES[STITCHES.length - 1].x : 0; }
+function leftX() { return STITCHES.length ? STITCHES[0].x : 0; }
+function resetBg() {
+	const c = bgC.getContext('2d');
+	c.drawImage(FABRIC_CV, 0, 0);                                  // cached static linen
+	c.save(); c.globalAlpha = 0.85; c.filter = `blur(${Math.round(H * 0.018)}px)`;
+	c.drawImage(SHADOWCV, 0, Math.round(H * 0.02)); c.restore();   // per-word contact shadow
+}
+
+// ---- satin sewing animation -------------------------------------------------
+// Lay ONE cross-stitch (row) at a time, FOLLOWING the stroke. Rows are BFS layers
+// over the stitch graph grown from each stroke's top-left start, so a layer is a
+// cross-section of the stroke and the needle advances ALONG it, turning with it.
+let anim = { rows: [], idx: 0, acc: 0, rate: 0, on: false };
+function buildSewRows(subset) {
+	if (!subset.length) return [];
+	const CELL = Math.max(4, STEP_G * 1.5), grid = new Map();
+	const key = (cx, cy) => cx + ',' + cy;
+	subset.forEach((s, idx) => { const k = key(Math.floor(s.x / CELL), Math.floor(s.y / CELL)); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(idx); });
+	const R2 = (STEP_G * 1.8) * (STEP_G * 1.8);
+	function nbrs(idx) { const s = subset[idx], cx = Math.floor(s.x / CELL), cy = Math.floor(s.y / CELL), out = []; for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) { const a = grid.get(key(cx + dx, cy + dy)); if (!a) continue; for (const j of a) { if (j === idx) continue; const ex = subset[j].x - s.x, ey = subset[j].y - s.y; if (ex * ex + ey * ey <= R2) out.push(j); } } return out; }
+	const visited = new Uint8Array(subset.length), rows = [];
+	const seeds = subset.map((s, i) => i).sort((a, b) => (subset[a].x + subset[a].y) - (subset[b].x + subset[b].y));
+	for (const seed of seeds) {
+		if (visited[seed]) continue;
+		let frontier = [seed]; visited[seed] = 1;
+		while (frontier.length) {
+			rows.push(frontier.map(i => subset[i]));        // one BFS layer = one cross-row (satin stitch)
+			const next = [];
+			for (const i of frontier) for (const j of nbrs(i)) if (!visited[j]) { visited[j] = 1; next.push(j); }
+			frontier = next;
+		}
+	}
+	return rows;
+}
+function startReveal(fromX, rate) {
+	resetBg();
+	const c = bgC.getContext('2d'), subset = [];
+	for (const s of STITCHES) { if (s.x <= fromX) drawStitch(c, s); else subset.push(s); }   // existing letters appear at once
+	if (REDUCED) { for (const s of subset) drawStitch(c, s); anim.on = false; return; }      // no motion: draw instantly
+	anim.rows = buildSewRows(subset);
+	anim.idx = 0; anim.acc = 0;
+	anim.rate = rate || 110;                          // satin stitches (cross-rows) laid per second
+	anim.on = anim.rows.length > 0;
+}
+function drawRowsTo(n) { const c = bgC.getContext('2d'); if (n > anim.rows.length) n = anim.rows.length; while (anim.idx < n) { const row = anim.rows[anim.idx++]; for (const s of row) drawStitch(c, s); } }
+
+// ---- subtle cursor sheen (no auto-drift; the cursor is the only motion) ------
+function drawSheen(lx, ly) {
+	const c = fxC.getContext('2d');
+	c.clearRect(0, 0, W, H);
+	const rad = W * 0.32, g = c.createRadialGradient(lx, ly, 0, lx, ly, rad);
+	g.addColorStop(0, 'rgba(255,250,238,0.18)'); g.addColorStop(0.5, 'rgba(255,250,238,0.055)'); g.addColorStop(1, 'rgba(255,250,238,0)');
+	c.fillStyle = g; c.fillRect(0, 0, W, H);
+	c.globalCompositeOperation = 'destination-in'; c.drawImage(MASKCV, 0, 0); c.globalCompositeOperation = 'source-over';
+}
+
+// ---- recompose on typing (animate only the new tail) ------------------------
+function recompose(animateTail) {
+	const prev = animateTail ? rightX() : -1;                // rightmost x of the previous word
+	build(); buildStitchList();
+	startReveal(animateTail && prev > 0 ? Math.min(prev, rightX()) : leftX() - 1, animateTail ? 320 : 110);
+	updateCaret();
+}
+
+// ---- drive ------------------------------------------------------------------
+let sheen = { x: 0, y: 0, set: false }, sheenDirty = true;
+window.addEventListener('pointermove', (e) => { const r = fxC.getBoundingClientRect(); sheen.x = ((e.clientX - r.left) / r.width) * W; sheen.y = ((e.clientY - r.top) / r.height) * H; sheen.set = true; sheenDirty = true; }, { passive: true });
+let lastTS = 0, loopStarted = false, booting = false;
+function loop(ts) {
+	if (!lastTS) lastTS = ts; const dt = Math.min(0.25, (ts - lastTS) / 1000); lastTS = ts;   // allow catch-up on low-fps/throttled frames so the reveal stays wall-clock-paced
+	if (anim.on) { anim.acc += anim.rate * dt; drawRowsTo(anim.acc); if (anim.idx >= anim.rows.length) anim.on = false; }
+	if (sheenDirty && MASKCV) { drawSheen(sheen.set ? sheen.x : W * 0.5, sheen.set ? sheen.y : H * 0.34); sheenDirty = false; }
+	requestAnimationFrame(loop);
+}
+
+// ---- typing -----------------------------------------------------------------
+const stage = document.getElementById('stage');
+let cleared = false;
+// don't hijack keystrokes meant for real form fields / buttons elsewhere on the page
+function isEditable(el) { if (!el) return false; const t = el.tagName; return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || t === 'BUTTON' || el.isContentEditable; }
+function announce() { if (live) live.textContent = WORD ? ('Embroidered word: ' + WORD) : 'empty'; }
+// listen on window so typing works without first clicking to focus a specific element
+window.addEventListener('keydown', (e) => {
+	if (e.metaKey || e.ctrlKey || e.altKey) return;
+	if (isEditable(e.target)) return;
+	const printable = [...e.key].length === 1;   // one code point → accepts accented/emoji, rejects named keys
+	if (e.key === 'Backspace') { e.preventDefault(); cleared = true; WORD = WORD.slice(0, -1); build(); buildStitchList(); resetBg(); drawAll(); updateCaret(); announce(); sheenDirty = true; return; }
+	if (e.key === 'Enter') { e.preventDefault(); recompose(false); return; }      // replay the full stitch-in
+	if (printable) { e.preventDefault(); if (!cleared) { WORD = ''; cleared = true; } WORD += e.key; updateCaret(); recompose(true); announce(); sheenDirty = true; }
+});
+stage.addEventListener('pointerdown', () => stage.focus());
+
+// fixed font size + left anchor (computed once) so typed letters stitch in without reflowing
+function calibrate() {
+	const c = bgC.getContext('2d');
+	c.font = '680 100px "Daith", Georgia, serif'; const w = c.measureText('Daith').width || 100;
+	FS = Math.round(100 * (W * 0.72) / w);
+	c.font = `680 ${FS}px "Daith", Georgia, serif`; ANCHOR_X = Math.round(W / 2 - c.measureText('Daith').width / 2);
+}
+
+// blinking text cursor at the end of the word, so it reads as typeable
+function updateCaret() {
+	const caret = document.getElementById('caret');
+	const c = bgC.getContext('2d'); c.font = `680 ${FS}px "Daith", Georgia, serif`;
+	const wWidth = c.measureText(WORD).width;
+	const scale = (bgC.clientWidth || W) / W;          // CSS px per internal px
+	const capH = FS * 0.7;
+	caret.style.left = ((ANCHOR_X + wWidth + FS * 0.05) * scale) + 'px';
+	caret.style.top = (0.5 * (bgC.clientHeight || H) - capH * scale / 2) + 'px';
+	caret.style.height = (capH * scale) + 'px';
+	caret.style.width = Math.max(2, Math.round(FS * 0.013 * scale)) + 'px';
+}
+
+async function boot() {
+	if (booting) return; booting = true;                 // re-entrancy guard (async boot + rapid resize)
+	try {
+		computeSize(); allocForSize();
+		try { await document.fonts.load('680 200px Daith', WORD); await document.fonts.ready; }
+		catch (e) { console.warn('Daith font failed to load; falling back to Georgia metrics.', e); }
+		PITCH = Math.max(3.4, H * 0.0095);
+		buildSprites(); calibrate();
+		build(); buildStitchList();
+		startReveal(leftX() - 1);          // stitch the word in on load
+		updateCaret(); announce();
+		loading.style.display = 'none';
+		sheenDirty = true;
+		if (!loopStarted) { loopStarted = true; requestAnimationFrame(loop); }   // single loop — resize must not stack another
+	} finally { booting = false; }         // never wedge the guard, even if a step throws
+}
+let rt;
+window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(boot, 200); });   // keep the typed word (no reset)
+boot();
+</script>
+</body>
+</html>

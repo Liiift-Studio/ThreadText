@@ -1,0 +1,32 @@
+{
+	"name": "@liiift-studio/stitchtype",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Render any text as photorealistic procedural satin-stitch embroidery, in real time in the browser, from the font's glyph geometry — STUB / in-progress, see HANDOFF.md",
+	"type": "module",
+	"scripts": {
+		"demo": "python3 -m http.server 8080",
+		"//": "TODO: scaffold build/test/lint per ../GUIDE.md (see floodText/package.json for the target shape)"
+	},
+	"keywords": [
+		"typography",
+		"web-typography",
+		"embroidery",
+		"satin-stitch",
+		"cross-stitch",
+		"thread",
+		"procedural",
+		"canvas",
+		"real-time",
+		"variable-font",
+		"liiift-studio",
+		"type-tools",
+		"frontend"
+	],
+	"author": "Quinn Keaveney <quinn@liiift.studio>",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Liiift-Studio/StitchType.git"
+	}
+}
