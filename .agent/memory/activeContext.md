@@ -31,13 +31,19 @@ package (`src/`) with React bindings and tests. Build + typecheck + tests all gr
 - Verified: `npm run lint` clean, `npm run test:run` 10/10, `npm run build` → ESM+CJS+dts.
 - Registered as a type-tools submodule; pushed to `Liiift-Studio/ThreadText`.
 
+## Done since
+- Folder renamed `stitchType/` → `threadText/` (submodule rewired; internal .gitmodules
+  section key is still "stitchType" — harmless).
+- Added to the shared tool directory (TOOL_IDS + ToolDirectory) and synced to all 17 tool
+  sites (each now lists Thread Text; existing tool colours unchanged — verified).
+- Framer (`src/framer/ThreadText.tsx`) + Webflow (`src/webflow/embed.ts`) bindings shipped.
+
 ## Immediate next steps (see ../HANDOFF.md §6)
-1. Rename the monorepo folder `stitchType/` → `threadText/` (submodule path rewiring).
-2. Framer + Webflow bindings (`src/framer/ThreadText.tsx`, `src/webflow/embed.ts`).
-3. Landing site under `site/` (Next.js) with a **free-licensed** VF (demo font is
-   Darden-proprietary — HANDOFF §7).
-4. npm publish + Vercel deploy (domain threadtext.com already owned).
-5. Perf: region-limit or Worker/WASM the per-keystroke geometry rebuild (HANDOFF §4.1).
+1. Landing site under `site/` (Next.js) with a **free-licensed** VF (demo font is
+   Darden-proprietary — HANDOFF §7). Then add `threadText` to `scripts/sync-sites.mjs`
+   SUBMODULES + parent `.gitmodules`-driven sync, and point threadtext.com (Vercel) at it.
+2. npm publish `@liiift-studio/threadtext@0.0.1` (unblocks the Framer esm.sh pin).
+3. Perf: region-limit or Worker/WASM the per-keystroke geometry rebuild (HANDOFF §4.1).
 
 ## Decisions on record
 - Keep **individual threads visible** — a WebGL anisotropic "silk" relight was tried and reverted because it washed the threads out (HANDOFF §4.3).

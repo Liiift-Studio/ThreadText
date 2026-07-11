@@ -15,8 +15,16 @@
 - [x] Tests (10 passing: pure math + lifecycle, canvas-2D stub for happy-dom).
 - [x] Verified: lint clean, tests 10/10, build → ESM + CJS + `.d.ts`.
 
+## Framer + Webflow (2026-07-11)
+- [x] `src/framer/ThreadText.tsx` — Framer code component (property controls, RenderTarget
+  gating, imperative core via esm.sh). `@ts-nocheck` (imports `framer` + a CDN URL) so
+  `tsc --noEmit` stays clean. NOTE: its esm.sh pin (`@0.0.1`) needs npm publish first.
+- [x] `src/webflow/embed.ts` — auto-inits `[data-threadtext]`, reads `data-tt-*`, sets
+  role=img/aria-label, exposes `window.ThreadText` {init, destroy}. `vite.webflow.config.ts`
+  → `dist/threadtext.webflow.min.js` (IIFE). `build:webflow` + `prepublishOnly` wired.
+- [x] Tests: `src/__tests__/webflow.test.ts` (4). Total 14 passing. lint clean, both builds green.
+
 ## Left to build (see ../HANDOFF.md)
-- [ ] Framer + Webflow bindings (`src/framer/`, `src/webflow/`).
 - [ ] `vercel.json`, `.claude/`, and the shared site-kit files (via parent `npm run sync`).
 - [ ] Landing site (Next.js) with a free-licensed demo font.
 - [ ] Register as a type-tools submodule; npm publish; Vercel deploy.
