@@ -1,15 +1,15 @@
-# stitchType
+# threadText
 
 **Render any text as photorealistic, procedural satin-stitch embroidery — in real time, in the browser, from the font's actual glyph geometry.**
 
-> Status: **in-progress.** The framework-agnostic core (`createStitchText`) + React
+> Status: **in-progress.** The framework-agnostic core (`createThreadText`) + React
 > hook/component are now extracted, typed, tested, and building to ESM/CJS/`.d.ts`. Still
 > to come: Framer/Webflow bindings and the landing site (and a free-licensed demo font).
 > The original reference renderer lives in [`demo/index.html`](./demo/index.html) and stays
 > the visual oracle. See [`HANDOFF.md`](./HANDOFF.md) for what's left; tool-build conventions
 > are in the monorepo [`../GUIDE.md`](../GUIDE.md).
 
-Name is a placeholder — rename freely (`satinType`, `threadText`, `sewType`, …).
+Homepage: [threadtext.com](https://threadtext.com) · npm: `@liiift-studio/threadtext`
 
 ---
 
@@ -49,31 +49,31 @@ Rasterise the glyphs → compute a signed-distance field → derive a **flow fie
 ## Use it (extracted API)
 
 ```ts
-import { createStitchText } from '@liiift-studio/stitchtype'
+import { createThreadText } from '@liiift-studio/threadtext'
 
 // Load the face first (any @font-face / next/font / CSS Font Loading API), then:
-const stitch = createStitchText(document.getElementById('host'), {
-  text: 'Satin',
+const thread = createThreadText(document.getElementById('host'), {
+  text: 'Thread',
   font: '"Your Font", Georgia, serif',
   weight: 680,
 })
 
-stitch.setText('Satins') // appended letters sew in; unrelated text re-sews the word
-stitch.replay()          // re-run the full sew-in
-stitch.resize()          // re-fit to the container
-stitch.destroy()         // cancel rAF, remove listeners, free canvases
+thread.setText('Threads') // appended letters sew in; unrelated text re-sews the word
+thread.replay()           // re-run the full sew-in
+thread.resize()           // re-fit to the container
+thread.destroy()          // cancel rAF, remove listeners, free canvases
 ```
 
 React:
 
 ```tsx
-import { StitchType } from '@liiift-studio/stitchtype'
+import { ThreadText } from '@liiift-studio/threadtext'
 
-<StitchType text="Satin" font='"Your Font", serif' weight={680} />
+<ThreadText text="Thread" font='"Your Font", serif' weight={680} />
 ```
 
 Colours (`threadColor`, `fabricColor`), thread `pitch`, `sewRate`, `sheen`, `animate`, and
-`reducedMotion` are all options — see `StitchOptions`. `react`/`react-dom` are optional
+`reducedMotion` are all options — see `ThreadTextOptions`. `react`/`react-dom` are optional
 peers; the core is framework-free.
 
 ## What's next

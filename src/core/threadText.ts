@@ -1,4 +1,4 @@
-// stitchType/src/core/stitchType.ts — framework-agnostic procedural satin-stitch renderer.
+// threadText/src/core/threadText.ts — framework-agnostic procedural satin-stitch renderer.
 //
 // Discrete pre-shaded thread sprites are laid on a flow field derived from the font's
 // glyph geometry (an exact Euclidean distance transform, smoothed in double-angle
@@ -8,10 +8,10 @@
 // cross-row at a time (BFS layers over the stitch graph, needle following each stroke).
 //
 // This is the demo/index.html renderer with its module-level globals lifted into
-// per-instance closure state, exposed through createStitchText() -> StitchInstance.
+// per-instance closure state, exposed through createThreadText() -> ThreadTextInstance.
 
-import type { StitchOptions, StitchInstance } from './types'
-import { STITCH_CLASSES } from './types'
+import type { ThreadTextOptions, ThreadTextInstance } from './types'
+import { THREAD_TEXT_CLASSES } from './types'
 
 // ─── Pure helpers (no DOM — unit-testable in isolation) ─────────────────────────
 
@@ -118,9 +118,9 @@ interface Stitch { x: number; y: number; ang: number; idx: number }
  *
  * When `target` is a plain element, two stacked canvases (base + sheen overlay) are
  * created inside it. When `target` is itself a `<canvas>`, it is used as the base and a
- * sheen overlay is added as a sibling. Returns a {@link StitchInstance} handle.
+ * sheen overlay is added as a sibling. Returns a {@link ThreadTextInstance} handle.
  */
-export function createStitchText(target: HTMLElement, opts: StitchOptions): StitchInstance {
+export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): ThreadTextInstance {
 	// SSR / no-DOM guard — return an inert handle.
 	if (typeof window === 'undefined' || typeof document === 'undefined' || !target) {
 		return { setText() {}, replay() {}, resize() {}, destroy() {}, get text() { return opts.text ?? '' } }
@@ -160,9 +160,9 @@ export function createStitchText(target: HTMLElement, opts: StitchOptions): Stit
 		bgC = document.createElement('canvas'); created.push(bgC)
 		container.appendChild(bgC)
 	}
-	bgC.classList.add(STITCH_CLASSES.bg)
+	bgC.classList.add(THREAD_TEXT_CLASSES.bg)
 	const fxC = document.createElement('canvas'); created.push(fxC)
-	fxC.classList.add(STITCH_CLASSES.fx)
+	fxC.classList.add(THREAD_TEXT_CLASSES.fx)
 	container.appendChild(fxC)
 	// Layout: bg in flow, fx overlaid with screen blend for the sheen.
 	if (getComputedStyle(container).position === 'static') container.style.position = 'relative'
@@ -493,7 +493,7 @@ export function createStitchText(target: HTMLElement, opts: StitchOptions): Stit
 	window.addEventListener('resize', onResize)
 
 	// ── public instance ──
-	const api: StitchInstance = {
+	const api: ThreadTextInstance = {
 		get text() { return text },
 		setText(next: string): void {
 			if (destroyed || !booted) { text = next ?? ''; return }

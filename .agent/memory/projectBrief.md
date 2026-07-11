@@ -9,7 +9,7 @@ The niche is empty — no existing tool combines {real-time · text-from-a-font 
 ## Scope (v1)
 - Satin-stitch look, white floss on dark woven fabric (colours should become options).
 - Any loaded (variable) font; type to recompose; sew-in animation; cursor sheen.
-- Ship as `@liiift-studio/stitchtype` per `../GUIDE.md` (Vite/TS core → React/Framer/Webflow → landing site → npm + Vercel).
+- Ship as `@liiift-studio/threadtext` (domain threadtext.com) per `../GUIDE.md` (Vite/TS core → React/Framer/Webflow → landing site → npm + Vercel).
 
 ## Not this tool
 The sibling WebGL "strike-on book page" (imprinted-paper hero) is a *different* exploration; it now lives in the Darden site as `daithHero`. Ignore it here.

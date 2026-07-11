@@ -1,5 +1,5 @@
 {
-	"name": "@liiift-studio/stitchtype",
+	"name": "@liiift-studio/threadtext",
 	"version": "0.0.1",
 	"description": "Render any text as photorealistic procedural satin-stitch embroidery, in real time in the browser, from the font's glyph geometry",
 	"type": "module",
@@ -55,6 +55,7 @@
 		"satin-stitch",
 		"cross-stitch",
 		"thread",
+		"thread-text",
 		"procedural",
 		"canvas",
 		"real-time",
@@ -68,13 +69,13 @@
 	],
 	"author": "Quinn Keaveney <quinn@liiift.studio>",
 	"license": "MIT",
-	"homepage": "https://stitchtype.com",
+	"homepage": "https://threadtext.com",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Liiift-Studio/StitchType.git"
+		"url": "https://github.com/Liiift-Studio/ThreadText.git"
 	},
 	"bugs": {
-		"url": "https://github.com/Liiift-Studio/StitchType/issues"
+		"url": "https://github.com/Liiift-Studio/ThreadText/issues"
 	},
 	"sideEffects": false,
 	"publishConfig": {

@@ -8,9 +8,9 @@
 - Passed a multi-agent code review; those fixes are in the demo (rAF teardown, Math.imul hashing, cached fabric + willReadFrequently, reduced-motion, aria-live, focus mgmt).
 
 ## Extracted (2026-07-11)
-- [x] Framework-agnostic `src/core/stitchType.ts` — `createStitchText()` factory, typed API.
-- [x] `src/core/types.ts` — `StitchOptions`, `StitchInstance`, `STITCH_CLASSES`.
-- [x] React hook + component (`src/react/useStitchType.ts`, `StitchType.tsx`).
+- [x] Framework-agnostic `src/core/threadText.ts` — `createThreadText()` factory, typed API.
+- [x] `src/core/types.ts` — `ThreadTextOptions`, `ThreadTextInstance`, `THREAD_TEXT_CLASSES`.
+- [x] React hook + component (`src/react/useThreadText.ts`, `ThreadText.tsx`).
 - [x] Vite/vitest/tsconfig bootstrap; `src/index.ts` public exports.
 - [x] Tests (10 passing: pure math + lifecycle, canvas-2D stub for happy-dom).
 - [x] Verified: lint clean, tests 10/10, build → ESM + CJS + `.d.ts`.

@@ -1,6 +1,6 @@
-// stitchType/src/index.ts — public API exports
-export { createStitchText } from './core/stitchType'
-export { useStitchType } from './react/useStitchType'
-export { StitchType } from './react/StitchType'
-export type { StitchOptions, StitchInstance } from './core/types'
-export { STITCH_CLASSES } from './core/types'
+// threadText/src/index.ts — public API exports
+export { createThreadText } from './core/threadText'
+export { useThreadText } from './react/useThreadText'
+export { ThreadText } from './react/ThreadText'
+export type { ThreadTextOptions, ThreadTextInstance } from './core/types'
+export { THREAD_TEXT_CLASSES } from './core/types'

@@ -1,9 +1,9 @@
-// stitchType/src/react/StitchType.tsx — React component wrapper
+// threadText/src/react/ThreadText.tsx — React component wrapper
 import React, { forwardRef, useCallback } from 'react'
-import { useStitchType } from './useStitchType'
-import type { StitchOptions } from '../core/types'
+import { useThreadText } from './useThreadText'
+import type { ThreadTextOptions } from '../core/types'
 
-interface StitchTypeProps extends StitchOptions {
+interface ThreadTextProps extends ThreadTextOptions {
 	className?: string
 	style?: React.CSSProperties
 	/** Container element type. (default: 'div') */
@@ -21,9 +21,9 @@ interface StitchTypeProps extends StitchOptions {
  * Drop-in component that embroiders `text` inside a self-sizing container. The canvas
  * output is decorative; the word is exposed to assistive tech via `aria-label`.
  */
-export const StitchType = forwardRef<HTMLElement, StitchTypeProps>(
-	function StitchType({ className, style, as: Tag = 'div', 'aria-label': ariaLabel, role, 'aria-describedby': ariaDescribedby, ...options }, forwardedRef) {
-		const innerRef = useStitchType(options)
+export const ThreadText = forwardRef<HTMLElement, ThreadTextProps>(
+	function ThreadText({ className, style, as: Tag = 'div', 'aria-label': ariaLabel, role, 'aria-describedby': ariaDescribedby, ...options }, forwardedRef) {
+		const innerRef = useThreadText(options)
 
 		// Merge the hook's internal ref with any forwarded ref.
 		const mergedRef = useCallback(
@@ -49,4 +49,4 @@ export const StitchType = forwardRef<HTMLElement, StitchTypeProps>(
 	},
 )
 
-StitchType.displayName = 'StitchType'
+ThreadText.displayName = 'ThreadText'

@@ -1,10 +1,10 @@
-// stitchType/src/core/types.ts — options, instance interface, and class constants
+// threadText/src/core/types.ts — options, instance interface, and class constants
 
 /**
  * Options controlling the procedural satin-stitch embroidery renderer.
  * Colours accept any CSS-ish hex (`#rgb` / `#rrggbb`) or `rgb()/rgba()` string.
  */
-export interface StitchOptions {
+export interface ThreadTextOptions {
 	/** The word (or short phrase) to embroider. */
 	text: string
 	/**
@@ -42,8 +42,8 @@ export interface StitchOptions {
 	aspect?: number
 }
 
-/** Live handle to a mounted stitchType renderer. */
-export interface StitchInstance {
+/** Live handle to a mounted threadText renderer. */
+export interface ThreadTextInstance {
 	/**
 	 * Re-embroider with new text. When `text` extends the current word (an append),
 	 * only the newly-added letters animate in; otherwise the whole word is re-sewn.
@@ -59,10 +59,10 @@ export interface StitchInstance {
 	readonly text: string
 }
 
-/** CSS class names applied to the canvases stitchType creates inside a container. */
-export const STITCH_CLASSES = {
+/** CSS class names applied to the canvases threadText creates inside a container. */
+export const THREAD_TEXT_CLASSES = {
 	/** Base canvas: woven fabric + baked satin stitches. */
-	bg: 'st-bg',
+	bg: 'tt-bg',
 	/** Overlay canvas: cursor sheen (`mix-blend-mode: screen`). */
-	fx: 'st-fx',
+	fx: 'tt-fx',
 } as const

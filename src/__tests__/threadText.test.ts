@@ -1,8 +1,8 @@
-// stitchType/src/__tests__/stitchType.test.ts — core math + instance lifecycle
+// threadText/src/__tests__/threadText.test.ts — core math + instance lifecycle
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { createStitchText, hash2, distanceInside, boxBlur, parseColor } from '../core/stitchType'
-import { STITCH_CLASSES } from '../core/types'
-import type { StitchInstance } from '../core/types'
+import { createThreadText, hash2, distanceInside, boxBlur, parseColor } from '../core/threadText'
+import { THREAD_TEXT_CLASSES } from '../core/types'
+import type { ThreadTextInstance } from '../core/types'
 
 // ─── Canvas 2D stub (happy-dom has no canvas backend) ───────────────────────────
 // Every drawing call is a no-op; the data-returning calls hand back correctly-sized
@@ -86,9 +86,9 @@ describe('pure helpers', () => {
 })
 
 // ─── Instance lifecycle ─────────────────────────────────────────────────────────
-describe('createStitchText', () => {
+describe('createThreadText', () => {
 	let host: HTMLDivElement
-	let inst: StitchInstance | null = null
+	let inst: ThreadTextInstance | null = null
 
 	beforeEach(() => {
 		host = document.createElement('div')
@@ -100,36 +100,36 @@ describe('createStitchText', () => {
 	})
 
 	it('creates two stacked canvases inside a container', () => {
-		inst = createStitchText(host, { text: 'Hi' })
+		inst = createThreadText(host, { text: 'Hi' })
 		const canvases = host.querySelectorAll('canvas')
 		expect(canvases.length).toBe(2)
-		expect(host.querySelector('.' + STITCH_CLASSES.bg)).toBeTruthy()
-		expect(host.querySelector('.' + STITCH_CLASSES.fx)).toBeTruthy()
+		expect(host.querySelector('.' + THREAD_TEXT_CLASSES.bg)).toBeTruthy()
+		expect(host.querySelector('.' + THREAD_TEXT_CLASSES.fx)).toBeTruthy()
 		expect(inst.text).toBe('Hi')
 	})
 
 	it('setText updates the current text (append animates the delta)', () => {
-		inst = createStitchText(host, { text: 'Da' })
-		inst.setText('Dai')
-		expect(inst.text).toBe('Dai')
+		inst = createThreadText(host, { text: 'Th' })
+		inst.setText('Thr')
+		expect(inst.text).toBe('Thr')
 		inst.setText('World') // non-append → full re-sew, must not throw
 		expect(inst.text).toBe('World')
 	})
 
 	it('replay and resize do not throw', () => {
-		inst = createStitchText(host, { text: 'Sew' })
+		inst = createThreadText(host, { text: 'Sew' })
 		expect(() => inst!.replay()).not.toThrow()
 		expect(() => inst!.resize()).not.toThrow()
 	})
 
 	it('reduced-motion draws instantly and still renders', () => {
-		inst = createStitchText(host, { text: 'Calm', reducedMotion: true })
+		inst = createThreadText(host, { text: 'Calm', reducedMotion: true })
 		expect(host.querySelectorAll('canvas').length).toBe(2)
 		expect(() => inst!.replay()).not.toThrow()
 	})
 
 	it('destroy removes created canvases and is idempotent', () => {
-		inst = createStitchText(host, { text: 'Bye' })
+		inst = createThreadText(host, { text: 'Bye' })
 		expect(host.querySelectorAll('canvas').length).toBe(2)
 		inst.destroy()
 		expect(host.querySelectorAll('canvas').length).toBe(0)
@@ -140,10 +140,10 @@ describe('createStitchText', () => {
 	it('accepts a <canvas> target and only adds the sheen overlay', () => {
 		const cv = document.createElement('canvas')
 		host.appendChild(cv)
-		inst = createStitchText(cv, { text: 'Ok' })
+		inst = createThreadText(cv, { text: 'Ok' })
 		// bg is the passed canvas; one extra fx overlay is created.
 		expect(host.querySelectorAll('canvas').length).toBe(2)
-		expect(cv.classList.contains(STITCH_CLASSES.bg)).toBe(true)
+		expect(cv.classList.contains(THREAD_TEXT_CLASSES.bg)).toBe(true)
 		inst.destroy()
 		// The passed canvas is left in place; only the created overlay is removed.
 		expect(host.contains(cv)).toBe(true)

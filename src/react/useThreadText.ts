@@ -1,22 +1,22 @@
-// stitchType/src/react/useStitchType.ts — React hook: instance lifecycle + text delta routing
+// threadText/src/react/useThreadText.ts — React hook: instance lifecycle + text delta routing
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { createStitchText } from '../core/stitchType'
-import type { StitchInstance, StitchOptions } from '../core/types'
+import { createThreadText } from '../core/threadText'
+import type { ThreadTextInstance, ThreadTextOptions } from '../core/types'
 
 /**
- * React hook that mounts a stitchType renderer inside a ref'd container.
+ * React hook that mounts a threadText renderer inside a ref'd container.
  *
  * The instance is (re)created only when a *structural* option changes (font, weight,
  * colours, pitch, sizing, motion). Changing just `text` routes through
  * `instance.setText()` so appended letters animate in without a full remount.
  * Re-fits to the container via ResizeObserver and tears down on unmount.
  *
- * @param options - {@link StitchOptions} for the renderer.
+ * @param options - {@link ThreadTextOptions} for the renderer.
  * @returns A ref to attach to the target container element.
  */
-export function useStitchType(options: StitchOptions) {
+export function useThreadText(options: ThreadTextOptions) {
 	const ref = useRef<HTMLElement>(null)
-	const instanceRef = useRef<StitchInstance | null>(null)
+	const instanceRef = useRef<ThreadTextInstance | null>(null)
 	const optionsRef = useRef(options)
 	optionsRef.current = options
 
@@ -30,7 +30,7 @@ export function useStitchType(options: StitchOptions) {
 		const el = ref.current
 		if (!el) return
 
-		const instance = createStitchText(el, optionsRef.current)
+		const instance = createThreadText(el, optionsRef.current)
 		instanceRef.current = instance
 
 		let rafId = 0
