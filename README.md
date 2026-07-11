@@ -2,7 +2,12 @@
 
 **Render any text as photorealistic, procedural satin-stitch embroidery — in real time, in the browser, from the font's actual glyph geometry.**
 
-> Status: **early / in-progress.** A fully working reference renderer lives in [`demo/index.html`](./demo/index.html). It has **not yet** been extracted into the `@liiift-studio` Vite/TS package + React/Framer/Webflow bindings + landing site that the other type-tools ship as. See [`HANDOFF.md`](./HANDOFF.md) for exactly what's done, what's left, and how to finish it. The tool-build conventions are in the monorepo [`../GUIDE.md`](../GUIDE.md).
+> Status: **in-progress.** The framework-agnostic core (`createStitchText`) + React
+> hook/component are now extracted, typed, tested, and building to ESM/CJS/`.d.ts`. Still
+> to come: Framer/Webflow bindings and the landing site (and a free-licensed demo font).
+> The original reference renderer lives in [`demo/index.html`](./demo/index.html) and stays
+> the visual oracle. See [`HANDOFF.md`](./HANDOFF.md) for what's left; tool-build conventions
+> are in the monorepo [`../GUIDE.md`](../GUIDE.md).
 
 Name is a placeholder — rename freely (`satinType`, `threadText`, `sewType`, …).
 
@@ -40,6 +45,36 @@ Type to embroider a new word · Backspace to unpick · Enter to replay the sew-i
 ## How it works (one paragraph)
 
 Rasterise the glyphs → compute a signed-distance field → derive a **flow field** (smoothed in double-angle orientation space so opposite edge-normals reinforce) so threads run across each stroke → lay thousands of discrete pre-shaded **thread sprites** oriented by the flow → lift to 3D with a dome-shade/normal map → seat on procedural woven fabric with a contact shadow → **sew it in** one BFS cross-row at a time (the needle follows the stroke) → a subtle cursor-driven sheen. Full walkthrough with line references in `HANDOFF.md`.
+
+## Use it (extracted API)
+
+```ts
+import { createStitchText } from '@liiift-studio/stitchtype'
+
+// Load the face first (any @font-face / next/font / CSS Font Loading API), then:
+const stitch = createStitchText(document.getElementById('host'), {
+  text: 'Satin',
+  font: '"Your Font", Georgia, serif',
+  weight: 680,
+})
+
+stitch.setText('Satins') // appended letters sew in; unrelated text re-sews the word
+stitch.replay()          // re-run the full sew-in
+stitch.resize()          // re-fit to the container
+stitch.destroy()         // cancel rAF, remove listeners, free canvases
+```
+
+React:
+
+```tsx
+import { StitchType } from '@liiift-studio/stitchtype'
+
+<StitchType text="Satin" font='"Your Font", serif' weight={680} />
+```
+
+Colours (`threadColor`, `fabricColor`), thread `pitch`, `sewRate`, `sheen`, `animate`, and
+`reducedMotion` are all options — see `StitchOptions`. `react`/`react-dom` are optional
+peers; the core is framework-free.
 
 ## What's next
 

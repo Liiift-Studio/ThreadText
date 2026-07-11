@@ -1,12 +1,52 @@
 {
 	"name": "@liiift-studio/stitchtype",
-	"version": "0.0.0",
-	"private": true,
-	"description": "Render any text as photorealistic procedural satin-stitch embroidery, in real time in the browser, from the font's glyph geometry — STUB / in-progress, see HANDOFF.md",
+	"version": "0.0.1",
+	"description": "Render any text as photorealistic procedural satin-stitch embroidery, in real time in the browser, from the font's glyph geometry",
 	"type": "module",
+	"main": "dist/index.cjs",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
 	"scripts": {
+		"build": "vite build",
+		"test": "vitest",
+		"test:run": "vitest run",
+		"lint": "tsc --noEmit",
 		"demo": "python3 -m http.server 8080",
-		"//": "TODO: scaffold build/test/lint per ../GUIDE.md (see floodText/package.json for the target shape)"
+		"prepublishOnly": "npm run test:run && npm run build"
+	},
+	"peerDependencies": {
+		"react": ">=17",
+		"react-dom": ">=17"
+	},
+	"peerDependenciesMeta": {
+		"react": {
+			"optional": true
+		},
+		"react-dom": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@testing-library/react": "^16.3.2",
+		"@types/react": "^19.0.0",
+		"@vitejs/plugin-react": "^4.0.0",
+		"happy-dom": "^20.10.6",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0",
+		"typescript": "^5.0.0",
+		"vite": "^6.0.0",
+		"vite-plugin-dts": "^4.0.0",
+		"vitest": "^3.0.0"
 	},
 	"keywords": [
 		"typography",
@@ -19,14 +59,25 @@
 		"canvas",
 		"real-time",
 		"variable-font",
+		"text-effect",
 		"liiift-studio",
 		"type-tools",
-		"frontend"
+		"frontend",
+		"react",
+		"typescript"
 	],
 	"author": "Quinn Keaveney <quinn@liiift.studio>",
 	"license": "MIT",
+	"homepage": "https://stitchtype.com",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/Liiift-Studio/StitchType.git"
+	},
+	"bugs": {
+		"url": "https://github.com/Liiift-Studio/StitchType/issues"
+	},
+	"sideEffects": false,
+	"publishConfig": {
+		"access": "public"
 	}
 }

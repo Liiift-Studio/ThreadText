@@ -1,16 +1,35 @@
 # Active Context — stitchType
 
-Last updated: 2026-07-10 (handoff seed)
+Last updated: 2026-07-11
 
 ## Current focus
-Fresh tool, seeded for handoff. The working renderer is in `demo/index.html`; nothing has been extracted into the package structure yet.
+First extraction slice **done**: the demo renderer is now a typed, framework-agnostic
+package (`src/`) with React bindings and tests. Build + typecheck + tests all green.
+`demo/index.html` remains the visual oracle.
+
+## Done in this slice
+- Bootstrap: `package.json` (`@liiift-studio/stitchtype` 0.0.1), `vite.config.ts`,
+  `vitest.config.ts`, `tsconfig.json` — matched against `../floodText`.
+- Core: `src/core/types.ts` (`StitchOptions`, `StitchInstance`, `STITCH_CLASSES`) and
+  `src/core/stitchType.ts` — the demo's module globals lifted into a `createStitchText()`
+  factory returning `{ setText, replay, resize, destroy, text }`. Pure helpers
+  (`hash2`, `vnoise`, `distanceInside`, `boxBlur`, `parseColor`) exported for testing.
+  Algorithm math is byte-for-byte the demo's; new options: font/weight/threadColor/
+  fabricColor/pitch/animate/sewRate/sheen/reducedMotion/aspect.
+- React: `src/react/useStitchType.ts` (structural-key remount + text→setText delta
+  routing + ResizeObserver) and `src/react/StitchType.tsx` (forwardRef, role="img",
+  aria-label defaults to text).
+- Tests: `src/__tests__/stitchType.test.ts` — 10 passing (pure math + lifecycle with a
+  canvas-2D stub; happy-dom has no canvas backend).
+- Verified: `npm run lint` clean, `npm run test:run` 10/10, `npm run build` → ESM+CJS+dts.
 
 ## Immediate next steps (see ../HANDOFF.md §6)
-1. Read `../GUIDE.md` (monorepo tool conventions) + skim `demo/index.html`.
-2. Bootstrap the package (package.json/vite/tsconfig/vercel/.claude) against a sibling (`../floodText`).
-3. Extract `src/core/stitchType.ts` per the proposed API in `HANDOFF.md` §5, using the demo as the visual oracle.
-4. React hook + component (the Darden React port `daithHero.js` on branch `feature/gamay-hero-explorations` in Darden-Studio is a working effect/cleanup template).
-5. Framer + Webflow bindings, tests, landing site, ship.
+1. Framer + Webflow bindings (`src/framer/StitchType.tsx`, `src/webflow/embed.ts`).
+2. Landing site under `site/` (Next.js) with a **free-licensed** VF (demo font is
+   Darden-proprietary — HANDOFF §7).
+3. Register as a type-tools submodule (needs the GitHub repo + deploy remote created).
+4. npm publish + Vercel deploy; update the parent pointer.
+5. Perf: region-limit or Worker/WASM the per-keystroke geometry rebuild (HANDOFF §4.1).
 
 ## Decisions on record
 - Keep **individual threads visible** — a WebGL anisotropic "silk" relight was tried and reverted because it washed the threads out (HANDOFF §4.3).

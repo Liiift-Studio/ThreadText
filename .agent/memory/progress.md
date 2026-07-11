@@ -7,10 +7,17 @@
 - Sew-in animation: one satin cross-row at a time, needle following each stroke (BFS layers).
 - Passed a multi-agent code review; those fixes are in the demo (rAF teardown, Math.imul hashing, cached fabric + willReadFrequently, reduced-motion, aria-live, focus mgmt).
 
-## Left to build (to be a real tool — see ../HANDOFF.md)
-- [ ] Extract framework-agnostic `src/core/stitchType.ts` (typed API).
-- [ ] React hook + component; Framer + Webflow bindings.
-- [ ] Vite/vitest/tsconfig/vercel bootstrap; tests.
+## Extracted (2026-07-11)
+- [x] Framework-agnostic `src/core/stitchType.ts` — `createStitchText()` factory, typed API.
+- [x] `src/core/types.ts` — `StitchOptions`, `StitchInstance`, `STITCH_CLASSES`.
+- [x] React hook + component (`src/react/useStitchType.ts`, `StitchType.tsx`).
+- [x] Vite/vitest/tsconfig bootstrap; `src/index.ts` public exports.
+- [x] Tests (10 passing: pure math + lifecycle, canvas-2D stub for happy-dom).
+- [x] Verified: lint clean, tests 10/10, build → ESM + CJS + `.d.ts`.
+
+## Left to build (see ../HANDOFF.md)
+- [ ] Framer + Webflow bindings (`src/framer/`, `src/webflow/`).
+- [ ] `vercel.json`, `.claude/`, and the shared site-kit files (via parent `npm run sync`).
 - [ ] Landing site (Next.js) with a free-licensed demo font.
 - [ ] Register as a type-tools submodule; npm publish; Vercel deploy.
 - [ ] Perf: region-limit or Worker/WASM the per-keystroke geometry rebuild.
