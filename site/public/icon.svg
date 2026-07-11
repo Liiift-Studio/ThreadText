@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Ground: threadText indigo -->
+  <rect width="64" height="64" rx="14" fill="#090268"/>
+  <!-- Satin stitches: two rows of slanted floss threads -->
+  <g fill="#fdf3df">
+    <rect x="12" y="18" width="5" height="14" rx="2.5" transform="rotate(-9 14.5 25)"/>
+    <rect x="21" y="18" width="5" height="14" rx="2.5" transform="rotate(-9 23.5 25)"/>
+    <rect x="30" y="18" width="5" height="14" rx="2.5" transform="rotate(-9 32.5 25)"/>
+    <rect x="39" y="18" width="5" height="14" rx="2.5" transform="rotate(-9 41.5 25)"/>
+    <rect x="48" y="18" width="5" height="14" rx="2.5" transform="rotate(-9 50.5 25)"/>
+    <rect x="12" y="34" width="5" height="14" rx="2.5" transform="rotate(9 14.5 41)" opacity="0.85"/>
+    <rect x="21" y="34" width="5" height="14" rx="2.5" transform="rotate(9 23.5 41)" opacity="0.85"/>
+    <rect x="30" y="34" width="5" height="14" rx="2.5" transform="rotate(9 32.5 41)" opacity="0.85"/>
+    <rect x="39" y="34" width="5" height="14" rx="2.5" transform="rotate(9 41.5 41)" opacity="0.85"/>
+    <rect x="48" y="34" width="5" height="14" rx="2.5" transform="rotate(9 50.5 41)" opacity="0.85"/>
+  </g>
+</svg>

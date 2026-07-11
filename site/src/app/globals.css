@@ -1,0 +1,21 @@
+/* Per-tool theme for threadText — base styles live in base.css (synced from type-tools/shared/styles/). */
+@import "tailwindcss";
+@import "./base.css";
+
+/* Demo/hero face — Fraunces variable (OFL), a soft chunky serif that embroiders well. */
+@font-face {
+	font-family: "Fraunces";
+	src: url("/fonts/Fraunces.woff2") format("woff2");
+	font-weight: 300 900;
+	font-display: block;
+}
+
+:root {
+	--background: oklch(0.240 0.1569 268); /* auto-written by npm run sync — do not edit manually */
+	--foreground: oklch(0.970 0.0080 268);
+	--foreground-muted: oklch(0.800 0.0250 268);
+	--foreground-subtle: oklch(0.680 0.0200 268);
+	--foreground-faint: oklch(0.580 0.0160 268);
+	--btn-bg: oklch(0.340 0.1262 268);
+	--panel: oklch(0.310 0.1049 268);
+}

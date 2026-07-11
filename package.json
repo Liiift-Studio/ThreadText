@@ -73,7 +73,7 @@
 	"homepage": "https://threadtext.com",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Liiift-Studio/ThreadText.git"
+		"url": "git+https://github.com/Liiift-Studio/ThreadText.git"
 	},
 	"bugs": {
 		"url": "https://github.com/Liiift-Studio/ThreadText/issues"

@@ -24,6 +24,16 @@
   → `dist/threadtext.webflow.min.js` (IIFE). `build:webflow` + `prepublishOnly` wired.
 - [x] Tests: `src/__tests__/webflow.test.ts` (4). Total 14 passing. lint clean, both builds green.
 
+## Landing site + ship (2026-07-11)
+- [x] Published `@liiift-studio/threadtext@0.0.1` to npm (unblocks the Framer esm.sh pin).
+- [x] Landing site under `site/` (cloned from floodText/site): hero, live embroidery Demo
+  (imperative `createThreadText` + controls), how-it-works, usage, options table, PortsSection,
+  footer. Theme = threadText indigo (hue 268). Demo font = **Fraunces** (OFL variable,
+  self-hosted `site/public/fonts/Fraunces.woff2`, latin subset). OG image + stitch favicon.
+- [x] Added `threadText` to `scripts/sync-sites.mjs` SUBMODULES (parent).
+- [x] Verified: `next build` clean (TS + static gen); `next start` serves 200 with correct
+  title/OG(png)/sitemap/icon; no SSR errors.
+
 ## Left to build (see ../HANDOFF.md)
 - [ ] `vercel.json`, `.claude/`, and the shared site-kit files (via parent `npm run sync`).
 - [ ] Landing site (Next.js) with a free-licensed demo font.
