@@ -16,6 +16,9 @@ const FONTS = [
 	{ label: "Handwriting", value: '"Snell Roundhand", "Segoe Script", "Brush Script MT", cursive' },
 ]
 
+/** Face the demo starts on — the handwriting/script category. */
+const DEFAULT_FONT = FONTS.find(f => f.label === "Handwriting")?.value ?? FONTS[0].value
+
 /** Labelled range slider with the value announced to screen readers. */
 function Slider({ label, value, min, max, step, fmt, onChange, title }: { label: string; value: number; min: number; max: number; step: number; fmt?: (v: number) => string; onChange: (v: number) => void; title?: string }) {
 	const valueId = `slider-val-${label.replace(/\s+/g, '-').toLowerCase()}`
@@ -45,7 +48,7 @@ export default function Demo() {
 	const instRef = useRef<ThreadTextInstance | null>(null)
 
 	const [text, setText] = useState("Thread")
-	const [font, setFont] = useState(FONTS[0].value)
+	const [font, setFont] = useState(DEFAULT_FONT)
 	const [weight, setWeight] = useState(680)
 	const [fill, setFill] = useState(0.9)
 	const [sewRate, setSewRate] = useState(140)
