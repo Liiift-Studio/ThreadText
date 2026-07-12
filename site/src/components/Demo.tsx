@@ -51,8 +51,9 @@ export default function Demo() {
 	const [sewRate, setSewRate] = useState(140)
 	const [threadColor, setThreadColor] = useState("#fdf3df")
 	const [sheen, setSheen] = useState(true)
+	const [sewStyle, setSewStyle] = useState<'machine' | 'hand'>('machine')
 
-	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, sheen })
+	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, sheen, sewStyle })
 
 	// Create once; everything below is applied live.
 	useEffect(() => {
@@ -86,11 +87,18 @@ export default function Demo() {
 
 	// Live parameter changes — instant redraw, no re-sew.
 	useEffect(() => {
-		instRef.current?.update({ font, weight, fill, sewRate, threadColor, sheen })
-	}, [font, weight, fill, sewRate, threadColor, sheen])
+		instRef.current?.update({ font, weight, fill, sewRate, threadColor, sheen, sewStyle })
+	}, [font, weight, fill, sewRate, threadColor, sheen, sewStyle])
 
 	// Text changes (input or canvas typing).
 	useEffect(() => { instRef.current?.setText(text) }, [text])
+
+	// Replay so the chosen sew style is immediately visible (skip the initial mount).
+	const styleMounted = useRef(false)
+	useEffect(() => {
+		if (!styleMounted.current) { styleMounted.current = true; return }
+		instRef.current?.replay()
+	}, [sewStyle])
 
 	const replay = useCallback(() => instRef.current?.replay(), [])
 
@@ -145,7 +153,24 @@ export default function Demo() {
 			<div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
 				<Slider label="Size" value={fill} min={0.4} max={1} step={0.02} fmt={v => `${Math.round(v * 100)}%`} onChange={setFill} title="Fraction of the width the word fills — refits to the container on resize" />
 				<Slider label="Weight" value={weight} min={200} max={900} step={10} onChange={setWeight} title="Numeric font weight — heavier strokes give broader satin bands" />
-				<Slider label="Sew rate" value={sewRate} min={30} max={320} step={10} fmt={v => `${v}/s`} onChange={setSewRate} title="How fast the sew-in animation lays rows — hit Replay to watch it" />
+				<Slider label="Sew rate" value={sewRate} min={30} max={320} step={10} fmt={v => `${v}/s`} onChange={setSewRate} title="How fast the sew-in animation lays stitches — hit Replay to watch it" />
+				<div className="flex flex-col gap-1">
+					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Sew style</span>
+					<div role="group" aria-label="Sew style" className="flex gap-2">
+						{([['machine', 'Machine'], ['hand', 'Hand']] as const).map(([v, lbl]) => (
+							<button
+								key={v}
+								onClick={() => setSewStyle(v)}
+								aria-pressed={sewStyle === v}
+								title={v === 'machine' ? 'Satin cross-rows fill each stroke in parallel — like a machine' : 'A single thread wanders stitch by stitch — like hand embroidery'}
+								className="text-xs px-3 py-2 rounded-full border transition-opacity"
+								style={{ borderColor: 'currentColor', opacity: sewStyle === v ? 1 : 0.5, background: sewStyle === v ? 'var(--btn-bg)' : 'transparent' }}
+							>
+								{lbl}
+							</button>
+						))}
+					</div>
+				</div>
 				<Toggle label="Sheen" on={sheen} onClick={() => setSheen(v => !v)} title="Cursor-following highlight that turns the threads over in the light" />
 				<label className="flex flex-col gap-1">
 					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Thread</span>

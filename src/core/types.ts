@@ -30,7 +30,15 @@ export interface ThreadTextOptions {
 	fill?: number
 	/** Play the sew-in animation on mount and on `replay()`. (default: true) */
 	animate?: boolean
-	/** Satin cross-rows laid per second during the sew-in. (default: 110) */
+	/**
+	 * How the word is sewn in:
+	 * - **'machine'** (default) — satin cross-rows appear in parallel across each stroke, like
+	 *   machine embroidery (a BFS over the stitch graph).
+	 * - **'hand'** — a single continuous thread wanders stitch by stitch along each stroke and
+	 *   carries to the next, laying one stitch at a time, like hand embroidery.
+	 */
+	sewStyle?: 'machine' | 'hand'
+	/** Satin cross-rows (machine) or stitches (hand) laid per second during the sew-in. (default: 110) */
 	sewRate?: number
 	/** Enable the cursor-following radial sheen on the overlay canvas. (default: true) */
 	sheen?: boolean

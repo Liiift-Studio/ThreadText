@@ -163,6 +163,14 @@ describe('createThreadText', () => {
 		expect(() => inst!.resize()).not.toThrow()
 	})
 
+	it('hand and machine sew styles both work', () => {
+		inst = createThreadText(host, { text: 'Hand', sewStyle: 'hand' })
+		expect(host.querySelectorAll('canvas').length).toBe(2)
+		expect(() => inst!.replay()).not.toThrow()
+		expect(() => inst!.update({ sewStyle: 'machine' })).not.toThrow()
+		expect(() => inst!.replay()).not.toThrow()
+	})
+
 	it('reduced-motion draws instantly and still renders', () => {
 		inst = createThreadText(host, { text: 'Calm', reducedMotion: true })
 		expect(host.querySelectorAll('canvas').length).toBe(2)

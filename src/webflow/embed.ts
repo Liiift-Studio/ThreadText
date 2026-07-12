@@ -29,6 +29,7 @@ const INSTANCES = new WeakMap<HTMLElement, Instance>()
  *   data-tt-thread-color  — floss colour (hex or rgb())
  *   data-tt-pitch         — thread spacing in px
  *   data-tt-fill          — fraction of the width the word fills (its size)
+ *   data-tt-sew-style     — "hand" for a single-thread hand look (default "machine")
  *   data-tt-sew-rate      — satin rows per second
  *   data-tt-sheen         — "false" to disable the cursor sheen
  *   data-tt-animate       — "false" to draw instantly (no sew-in)
@@ -46,6 +47,7 @@ function readOptions(el: HTMLElement, fallbackText: string): ThreadTextOptions {
 	if (d.ttThreadColor) opts.threadColor = d.ttThreadColor
 	if (d.ttPitch !== undefined) { const n = parseFloat(d.ttPitch); if (!isNaN(n)) opts.pitch = n }
 	if (d.ttFill !== undefined) { const n = parseFloat(d.ttFill); if (!isNaN(n)) opts.fill = n }
+	if (d.ttSewStyle === 'hand') opts.sewStyle = 'hand'
 	if (d.ttSewRate !== undefined) { const n = parseFloat(d.ttSewRate); if (!isNaN(n)) opts.sewRate = n }
 	if (d.ttSheen === 'false') opts.sheen = false
 	if (d.ttAnimate === 'false') opts.animate = false

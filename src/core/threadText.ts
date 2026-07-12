@@ -138,6 +138,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let weight = clamp(opts.weight ?? 680, 1, 1000)
 	let fill = clamp(opts.fill ?? 0.9, 0.05, 1)
 	let sewRate = Math.max(1, opts.sewRate ?? 110)
+	let sewStyle: 'machine' | 'hand' = opts.sewStyle === 'hand' ? 'hand' : 'machine'
 	let sheenOn = opts.sheen ?? true
 	let animate = opts.animate ?? true
 	let editable = opts.editable ?? false
@@ -425,12 +426,69 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		}
 		return rows
 	}
+	// Hand sew: a single continuous thread. Greedy walk — from each stitch go to the nearest
+	// unvisited neighbour along the stroke; when a stroke dead-ends, carry the thread to the
+	// nearest remaining stitch and continue. Yields one stitch per step (revealed one at a time),
+	// so it reads as a person stitching rather than a machine laying whole rows at once.
+	function buildHandPath(subset: Stitch[]): Stitch[] {
+		if (!subset.length) return []
+		const CELL = Math.max(4, STEP_G * 1.5), grid = new Map<string, number[]>()
+		const key = (cx: number, cy: number) => cx + ',' + cy
+		subset.forEach((s, idx) => { const k = key(Math.floor(s.x / CELL), Math.floor(s.y / CELL)); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(idx) })
+		const R2 = (STEP_G * 1.8) * (STEP_G * 1.8)
+		const remove = (idx: number) => {                // keep buckets to unvisited only
+			const s = subset[idx], k = key(Math.floor(s.x / CELL), Math.floor(s.y / CELL))
+			const a = grid.get(k); if (!a) return
+			const p = a.indexOf(idx); if (p >= 0) a.splice(p, 1)
+			if (!a.length) grid.delete(k)
+		}
+		/** Nearest still-unvisited stitch within the neighbour radius (continue the stroke). */
+		function nearestNbr(idx: number): number {
+			const s = subset[idx], cx = Math.floor(s.x / CELL), cy = Math.floor(s.y / CELL)
+			let best = -1, bestD = Infinity
+			for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+				const a = grid.get(key(cx + dx, cy + dy)); if (!a) continue
+				for (const j of a) { const ex = subset[j].x - s.x, ey = subset[j].y - s.y; const d = ex * ex + ey * ey; if (d <= R2 && d < bestD) { bestD = d; best = j } }
+			}
+			return best
+		}
+		/** Nearest still-unvisited stitch anywhere (carry the thread to the next stroke). */
+		function nearestAny(idx: number): number {
+			const s = subset[idx], cx0 = Math.floor(s.x / CELL), cy0 = Math.floor(s.y / CELL)
+			let best = -1, bestD = Infinity
+			for (let r = 1; r < 512; r++) {
+				for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+					if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue   // scan the ring only
+					const a = grid.get(key(cx0 + dx, cy0 + dy)); if (!a) continue
+					for (const j of a) { const ex = subset[j].x - s.x, ey = subset[j].y - s.y; const d = ex * ex + ey * ey; if (d < bestD) { bestD = d; best = j } }
+				}
+				// once found, one more ring guarantees the true nearest, then stop
+				if (best >= 0 && r > Math.ceil(Math.sqrt(bestD) / CELL) + 1) break
+			}
+			return best
+		}
+		let cur = 0
+		for (let i = 1; i < subset.length; i++) if (subset[i].x + subset[i].y < subset[cur].x + subset[cur].y) cur = i   // start top-left
+		const path: Stitch[] = [subset[cur]]; remove(cur)
+		for (let n = 1; n < subset.length; n++) {
+			let nxt = nearestNbr(cur)
+			if (nxt < 0) nxt = nearestAny(cur)
+			if (nxt < 0) break
+			path.push(subset[nxt]); remove(nxt); cur = nxt
+		}
+		return path
+	}
 	function startReveal(): void {
 		resetBg()
 		if (REDUCED || !animate) { drawAll(); anim.on = false; return }
-		anim.rows = buildSewRows(STITCHES)
+		if (sewStyle === 'hand') {
+			anim.rows = buildHandPath(STITCHES).map((s) => [s])      // one stitch per step
+			anim.rate = Math.max(sewRate, STITCHES.length / 3.2)     // pace so it finishes in ~3s regardless of count
+		} else {
+			anim.rows = buildSewRows(STITCHES)                       // machine cross-rows
+			anim.rate = sewRate
+		}
 		anim.idx = 0; anim.acc = 0
-		anim.rate = sewRate
 		anim.on = anim.rows.length > 0
 	}
 	function drawRowsTo(n: number): void {
@@ -639,6 +697,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			if (partial.pitch !== undefined && partial.pitch !== pitchOpt) { pitchOpt = partial.pitch; geom = true }
 			if (partial.threadColor !== undefined) { setThreadRamp(partial.threadColor); spritesOnly = true }
 			if (partial.sewRate !== undefined) sewRate = Math.max(1, partial.sewRate)
+			if (partial.sewStyle !== undefined) sewStyle = partial.sewStyle === 'hand' ? 'hand' : 'machine'
 			if (partial.animate !== undefined) animate = partial.animate
 			if (partial.onTextChange !== undefined) onTextChange = partial.onTextChange
 			if (partial.sheen !== undefined) applySheen(partial.sheen)
