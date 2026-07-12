@@ -115,7 +115,19 @@ export default function Demo() {
 				</label>
 				<label className="flex flex-col gap-1">
 					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Font</span>
-					<select value={font} aria-label="Font" onChange={e => setFont(e.target.value)} className="bg-transparent border rounded-lg px-3 py-2 text-base" style={{ borderColor: 'currentColor' }}>
+					<select
+						value={font}
+						aria-label="Font"
+						onChange={e => setFont(e.target.value)}
+						className="border rounded-lg pl-3 pr-9 py-2 text-base"
+						style={{
+							borderColor: 'currentColor',
+							WebkitAppearance: 'none',
+							appearance: 'none',
+							// Custom chevron with real breathing room from the right edge.
+							background: "transparent url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23b7bece' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\") no-repeat right 0.85rem center",
+						}}
+					>
 						{FONTS.map(f => <option key={f.label} value={f.value} style={{ color: '#111', background: '#fff' }}>{f.label}</option>)}
 					</select>
 				</label>
