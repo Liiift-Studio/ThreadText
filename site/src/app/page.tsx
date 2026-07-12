@@ -51,7 +51,7 @@ export default function Home() {
 					<span>TypeScript</span><span aria-hidden="true">·</span><span>Zero dependencies</span><span aria-hidden="true">·</span><span>React + Vanilla JS</span>
 				</div>
 				<p className="text-base leading-relaxed max-w-lg">
-					Give it a word in any loaded font and it renders as raised satin floss on woven fabric — threads that run <em>across</em> each stroke and fan around the curves, lifted into 3D, seated with a contact shadow, and sewn in one satin stitch at a time. Photorealistic <em>by construction</em>, from the font&rsquo;s real glyph geometry — not a raster filter, not an AI image.
+					Give it a word in any loaded font and it renders as raised satin floss on a transparent ground — threads that run <em>across</em> each stroke and fan around the curves, lifted into 3D and sewn in one satin stitch at a time. Drop it over any background. Photorealistic <em>by construction</em>, from the font&rsquo;s real glyph geometry — not a raster filter, not an AI image.
 				</p>
 			</section>
 
