@@ -30,9 +30,9 @@ export default function Home() {
 			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-6">
 				<div className="flex flex-col gap-2">
 					<p className="text-xs uppercase tracking-[0.18em] font-medium text-muted">threadtext</p>
-					<h1 className="text-5xl lg:text-8xl xl:text-9xl" style={{ fontFamily: '"Fraunces", Georgia, serif', fontWeight: 640, lineHeight: "1.02em" }}>
+					<h1 className="text-4xl lg:text-8xl xl:text-9xl" style={{ fontFamily: "var(--font-merriweather), serif", fontVariationSettings: '"wght" 360, "opsz" 144', lineHeight: "1.05em" }}>
 						Text,<br />
-						<span style={{ color: "var(--foreground-subtle)", fontStyle: "italic", fontWeight: 520 }}>embroidered.</span>
+						<span style={{ color: "var(--foreground-subtle)", fontStyle: "italic", fontVariationSettings: '"wght" 300, "opsz" 144' }}>embroidered.</span>
 					</h1>
 				</div>
 				<div className="flex items-center gap-4">
