@@ -69,10 +69,14 @@ function initElement(el: HTMLElement): void {
 	if (!text) return
 
 	const options = readOptions(el, text)
-	// The word is drawn on a canvas — keep it announced to screen readers.
-	el.setAttribute('role', 'img')
-	el.setAttribute('aria-label', text)
 	el.innerHTML = ''
+	// The word is drawn on a canvas — keep it announced to screen readers. In editable mode
+	// the renderer adds a real <input>, so role=img (which hides descendants from AT) must NOT
+	// be set — the input is the accessible control.
+	if (!options.editable) {
+		el.setAttribute('role', 'img')
+		el.setAttribute('aria-label', text)
+	}
 
 	const instance = createThreadText(el, options)
 	INSTANCES.set(el, { instance, originalHTML })

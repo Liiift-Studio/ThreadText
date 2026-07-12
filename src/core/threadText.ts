@@ -106,6 +106,8 @@ export function parseColor(input: string, fallback: [number, number, number]): [
 
 /** Clamp a number to the 0–255 byte range and round. */
 function byte(n: number): number { return n < 0 ? 0 : n > 255 ? 255 : Math.round(n) }
+/** Clamp a number to [lo, hi]. */
+function clamp(n: number, lo: number, hi: number): number { return n < lo ? lo : n > hi ? hi : n }
 
 /** First font-family token, unquoted — for `document.fonts.load/check`. */
 function primaryOf(font: string): string {
@@ -133,9 +135,9 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	// ── mutable options / config ──
 	let text = opts.text ?? ''
 	let font = opts.font ?? 'Georgia, serif'
-	let weight = opts.weight ?? 680
-	let fill = opts.fill ?? 0.9
-	let sewRate = opts.sewRate ?? 110
+	let weight = clamp(opts.weight ?? 680, 1, 1000)
+	let fill = clamp(opts.fill ?? 0.9, 0.05, 1)
+	let sewRate = Math.max(1, opts.sewRate ?? 110)
 	let sheenOn = opts.sheen ?? true
 	let animate = opts.animate ?? true
 	let editable = opts.editable ?? false
@@ -178,7 +180,10 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	bgC.style.display = 'block'; bgC.style.width = '100%'
 	Object.assign(fxC.style, { position: 'absolute', inset: '0', width: '100%', pointerEvents: 'none', mixBlendMode: 'screen' } as CSSStyleDeclaration)
 
-	// Caret element (editable mode).
+	// Editable capture: a real (transparent) <input> overlay — gives assistive tech a proper
+	// text value, raises the soft keyboard on touch, and supports IME/paste. The visible caret
+	// is drawn on the canvas; the input's own text/caret are transparent.
+	let editInput: HTMLInputElement | null = null
 	let caretEl: HTMLElement | null = null
 	let focused = false
 
@@ -187,6 +192,8 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let FS = 0, ANCHOR_X = 0
 	let PITCH = 4
 	let SPRITES: HTMLCanvasElement[] = [], SPRITE_W = 0, SPRITE_H = 0
+	let spritePitch = -1, spriteColorKey = ''   // cache keys so sprites rebuild only when needed
+	let allocW = -1, allocH = -1                // OFFCV realloc only when size changes
 	let MASK: Uint8Array = new Uint8Array(0)
 	let SHADE: Float32Array = new Float32Array(0)
 	let EX: Float32Array = new Float32Array(0), EY: Float32Array = new Float32Array(0)
@@ -199,7 +206,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	const sheen = { x: 0, y: 0, set: false }
 	let sheenDirty = true
 
-	let rafId = 0, loopStarted = false, lastTS = 0
+	let rafId = 0, running = false, lastTS = 0
 	let destroyed = false, booted = false
 
 	// ── fit-to-width sizing: derive FS from the container width, height from the glyphs ──
@@ -208,14 +215,15 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		const cssW = Math.max(1, Math.round(rect.width || Math.min(window.innerWidth * 0.95, 1240)))
 		const ref = text || 'Ag'
 		const mc = bgC.getContext('2d')
+		if (mc) mc.textBaseline = 'middle'   // measure extents around the same baseline build() paints on
 
 		// Font size (CSS px) so the word spans fill × container width.
 		let refW100 = 100
 		if (mc) { mc.font = `${weight} 100px ${font}`; refW100 = mc.measureText(ref).width || 100 }
-		let fsCss = Math.max(8, (100 * (cssW * fill)) / refW100)
+		const fsCss = Math.max(8, (100 * (cssW * fill)) / refW100)
 
 		// Height (CSS px) from the glyph extent around the middle baseline, plus a little padding.
-		let asc = fsCss * 0.70, desc = fsCss * 0.30, refWfs = cssW * fill
+		let asc = fsCss * 0.62, desc = fsCss * 0.62, refWfs = cssW * fill
 		if (mc) {
 			mc.font = `${weight} ${fsCss}px ${font}`
 			const m = mc.measureText(ref)
@@ -223,7 +231,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			if (m.actualBoundingBoxAscent > 0) asc = m.actualBoundingBoxAscent
 			if (m.actualBoundingBoxDescent > 0) desc = m.actualBoundingBoxDescent
 		}
-		const cssH = Math.max(1, Math.round(2 * Math.max(asc, desc) * 1.12))
+		const cssH = Math.max(1, Math.round(2 * Math.max(asc, desc) * 1.1))
 
 		// DPR + area budget (keep the per-render cost bounded).
 		let scale = Math.min(window.devicePixelRatio || 1, 1.7)
@@ -238,10 +246,12 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		PITCH = pitchOpt != null ? pitchOpt : Math.max(3.0, H * 0.0095)
 	}
 
-	// ── reused glyph-raster scratch (sized to the canvas) ──
-	function allocScratch(): void {
+	// ── reused glyph-raster scratch (reallocated only when the canvas size changes) ──
+	function ensureScratch(): void {
+		if (OFFCV && allocW === W && allocH === H) return
 		OFFCV = document.createElement('canvas'); OFFCV.width = W; OFFCV.height = H
 		OFFCTX = OFFCV.getContext('2d', { willReadFrequently: true })
+		allocW = W; allocH = H
 	}
 
 	// ── thread sprite (pre-shaded), in 20 brightness variants ──
@@ -283,6 +293,12 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			c.fillStyle = ge; c.fillRect(0, 0, SPRITE_W, SPRITE_H)
 			SPRITES.push(cv)
 		}
+		spritePitch = PITCH; spriteColorKey = threadPeak.join(',')
+	}
+	/** Rebuild the sprite sheet only if the thread pitch or colour changed. */
+	function ensureSprites(): void {
+		if (SPRITES.length && spritePitch === PITCH && spriteColorKey === threadPeak.join(',')) return
+		buildSprites()
 	}
 
 	// ── geometry pass for the current word ──
@@ -352,7 +368,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		}
 	}
 
-	// ── stitch list (sorted by x only for leftX/rightX bounds; reveal order is the BFS) ──
+	// ── stitch list: sample the mask on a jittered grid ──
 	function buildStitchList(): void {
 		const STEP = Math.max(1.6, PITCH * 0.6); STEP_G = STEP
 		const list: Stitch[] = []
@@ -367,7 +383,6 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			let b = SHADE[i] * jit; b = b < 0 ? 0 : b > 1.12 ? 1.12 : b
 			list.push({ x: px, y: py, ang, idx: Math.min(19, Math.max(0, Math.round((b / 1.12) * 19))) })
 		}
-		list.sort((a, b) => a.x - b.x)   // for leftX/rightX bounds
 		STITCHES = list
 	}
 
@@ -375,8 +390,6 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		c.save(); c.translate(s.x, s.y); c.rotate(s.ang); c.drawImage(SPRITES[s.idx], -SPRITE_W / 2, -SPRITE_H / 2); c.restore()
 	}
 	function drawAll(): void { const c = bgC.getContext('2d'); if (!c) return; for (const s of STITCHES) drawStitch(c, s) }
-	function rightX(): number { return STITCHES.length ? STITCHES[STITCHES.length - 1].x : 0 }
-	function leftX(): number { return STITCHES.length ? STITCHES[0].x : 0 }
 	/** Clear the base canvas to transparent (no fabric, no contact shadow). */
 	function resetBg(): void {
 		const c = bgC.getContext('2d'); if (!c) return
@@ -460,55 +473,64 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		caretEl.style.background = `rgb(${byte(threadPeak[0])},${byte(threadPeak[1])},${byte(threadPeak[2])})`
 	}
 
-	// ── the rAF loop ──
+	// ── the rAF loop (parks itself when idle, restarted on demand via kick()) ──
+	function kick(): void {
+		if (destroyed || running) return
+		running = true; lastTS = 0
+		rafId = requestAnimationFrame(loop)
+	}
 	function loop(ts: number): void {
-		if (destroyed) return
+		if (destroyed) { running = false; return }
 		if (!lastTS) lastTS = ts
-		const dt = Math.min(0.25, (ts - lastTS) / 1000); lastTS = ts   // catch-up on throttled frames → wall-clock-paced reveal
+		const dt = Math.min(0.25, (ts - lastTS) / 1000); lastTS = ts   // clamp guards huge jumps after tab-throttle
 		if (anim.on) { anim.acc += anim.rate * dt; drawRowsTo(anim.acc); if (anim.idx >= anim.rows.length) anim.on = false }
 		if (sheenDirty && MASKCV) { drawSheen(sheen.set ? sheen.x : W * 0.5, sheen.set ? sheen.y : H * 0.45); sheenDirty = false }
-		if (caretEl) caretEl.style.opacity = (editable && focused && (Math.floor(ts / 530) % 2 === 0)) ? '1' : '0'
+		const blinking = editable && focused
+		if (caretEl) caretEl.style.opacity = (blinking && (Math.floor(ts / 530) % 2 === 0)) ? '1' : '0'
+		if (!anim.on && !sheenDirty && !blinking) { running = false; return }   // idle → stop scheduling
 		rafId = requestAnimationFrame(loop)
 	}
 
-	// ── input: cursor sheen tracking ──
+	// ── input: cursor sheen tracking (scoped to the element, not the whole window) ──
 	function onPointerMove(e: PointerEvent): void {
-		const r = fxC.getBoundingClientRect()
+		const r = container.getBoundingClientRect()
 		sheen.x = ((e.clientX - r.left) / (r.width || 1)) * W
 		sheen.y = ((e.clientY - r.top) / (r.height || 1)) * H
-		sheen.set = true; sheenDirty = true
+		sheen.set = true; sheenDirty = true; kick()
 	}
+	function onPointerLeave(): void { sheen.set = false; sheenDirty = true; kick() }   // fall back to a centred resting glow
 
-	// ── input: typing (editable mode) ──
-	function onKeyDown(e: KeyboardEvent): void {
-		if (!editable || e.metaKey || e.ctrlKey || e.altKey) return
-		if (e.key === 'Backspace') { e.preventDefault(); commitText(text.slice(0, -1), true); return }
-		if (e.key === 'Enter') { e.preventDefault(); api.replay(); return }
-		if ([...e.key].length === 1) { e.preventDefault(); commitText(text + e.key, true) }
-	}
-	function onFocus(): void { focused = true }
+	// ── input: typing (editable mode) — backed by a real <input> for a11y / touch / IME ──
+	function onInput(): void { if (editInput) commitText(editInput.value, true) }
+	function onEditKeyDown(e: KeyboardEvent): void { if (e.key === 'Enter') { e.preventDefault(); api.replay() } }
+	function onFocus(): void { focused = true; kick() }
 	function onBlur(): void { focused = false; if (caretEl) caretEl.style.opacity = '0' }
-	function onPointerDown(): void { if (editable) container.focus() }
 
 	function applyEditable(on: boolean): void {
+		if (on === editable && editInput) return
 		editable = on
 		if (on) {
-			container.tabIndex = 0
-			container.setAttribute('role', 'textbox')
-			if (!container.getAttribute('aria-label')) container.setAttribute('aria-label', 'Editable embroidered text — type to change it')
-			ensureCaret()
-			container.addEventListener('keydown', onKeyDown)
-			container.addEventListener('focus', onFocus)
-			container.addEventListener('blur', onBlur)
-			container.addEventListener('pointerdown', onPointerDown)
-			updateCaret()
+			if (!editInput) {
+				editInput = document.createElement('input')
+				editInput.type = 'text'
+				editInput.value = text
+				editInput.maxLength = 64
+				editInput.setAttribute('aria-label', 'Embroidered text — type to change it')
+				editInput.setAttribute('autocomplete', 'off')
+				editInput.setAttribute('autocapitalize', 'off')
+				editInput.spellcheck = false
+				// Overlays the artwork, fully transparent, but a real focusable text field.
+				Object.assign(editInput.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', margin: '0', padding: '0', border: '0', outline: 'none', background: 'transparent', color: 'transparent', caretColor: 'transparent', font: 'inherit', textAlign: 'center', cursor: 'text' } as CSSStyleDeclaration)
+				editInput.addEventListener('input', onInput)
+				editInput.addEventListener('keydown', onEditKeyDown)
+				editInput.addEventListener('focus', onFocus)
+				editInput.addEventListener('blur', onBlur)
+				container.appendChild(editInput); created.push(editInput)
+			}
+			ensureCaret(); updateCaret()
 		} else {
-			container.removeAttribute('tabindex')
-			container.removeAttribute('role')
-			container.removeEventListener('keydown', onKeyDown)
-			container.removeEventListener('focus', onFocus)
-			container.removeEventListener('blur', onBlur)
-			container.removeEventListener('pointerdown', onPointerDown)
+			if (editInput) { editInput.remove(); editInput = null }
+			focused = false
 			if (caretEl) caretEl.style.opacity = '0'
 		}
 	}
@@ -517,21 +539,24 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		if (on === sheenOn) return
 		sheenOn = on
 		if (on) {
-			window.addEventListener('pointermove', onPointerMove, { passive: true })
+			container.addEventListener('pointermove', onPointerMove, { passive: true })
+			container.addEventListener('pointerleave', onPointerLeave, { passive: true })
 			sheen.set = false     // show a centred resting glow until the cursor moves over the art
-			sheenDirty = true
+			sheenDirty = true; kick()
 		} else {
-			window.removeEventListener('pointermove', onPointerMove)
+			container.removeEventListener('pointermove', onPointerMove)
+			container.removeEventListener('pointerleave', onPointerLeave)
 			const c = fxC.getContext('2d'); if (c) c.clearRect(0, 0, W, H)   // clear immediately
 		}
 	}
 
 	// ── full render: fit to width, rebuild geometry, then sew or draw instantly ──
 	function render(sew: boolean): void {
-		layout(); allocScratch(); buildSprites(); build(); buildStitchList()
+		layout(); ensureScratch(); ensureSprites(); build(); buildStitchList()
 		if (sew) startReveal()
 		else { resetBg(); drawAll(); anim.on = false }
-		updateCaret(); sheenDirty = true
+		if (editInput && editInput.value !== text) editInput.value = text
+		updateCaret(); sheenDirty = true; kick()
 	}
 
 	/** Set text and redraw instantly (no sew-in). `notify` fires onTextChange (internal edits only). */
@@ -545,16 +570,18 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	}
 
 	// Wait for a face to be available (bounded), then run cb. Immediate if already loaded / no API.
-	let fontTimer: ReturnType<typeof setTimeout> | undefined
+	const fontTimers = new Set<ReturnType<typeof setTimeout>>()
 	function whenFontReady(fam: string, wght: number, cb: () => void): void {
 		const spec = `${wght} 200px ${fam}`
 		let already = false
 		try { already = !!document.fonts && document.fonts.check(spec) } catch { already = true }
 		if (!document.fonts || already) { cb(); return }
 		let done = false
-		const go = () => { if (!done) { done = true; if (fontTimer) clearTimeout(fontTimer); cb() } }
+		let timer: ReturnType<typeof setTimeout>
+		const go = () => { if (done) return; done = true; clearTimeout(timer); fontTimers.delete(timer); if (!destroyed) cb() }
 		document.fonts.load(spec, text).then(() => document.fonts.ready).then(go, go)
-		fontTimer = setTimeout(go, 1500)
+		timer = setTimeout(go, 1500)   // never wait forever on a font that won't load
+		fontTimers.add(timer)
 	}
 
 	// ── boot ──
@@ -562,15 +589,28 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		if (destroyed) return
 		render(true)   // sew-in on mount (when animate)
 		booted = true
-		if (!loopStarted) { loopStarted = true; rafId = requestAnimationFrame(loop) }
 	}
-	if (editable) applyEditable(true)
-	if (sheenOn) window.addEventListener('pointermove', onPointerMove, { passive: true })
+	if (editable) { editable = false; applyEditable(true) }
+	if (sheenOn) {
+		container.addEventListener('pointermove', onPointerMove, { passive: true })
+		container.addEventListener('pointerleave', onPointerLeave, { passive: true })
+	}
 	whenFontReady(primaryFamily, weight, firstPaint)
 
 	// Debounced self-resize so the standalone (non-React) API stays responsive.
+	// Guarded on width so height-only changes (which layout() itself induces) don't rebuild.
 	let resizeTimer: ReturnType<typeof setTimeout> | undefined
-	function onResize(): void { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => api.resize(), 200) }
+	let lastResizeW = -1
+	function onResize(): void {
+		clearTimeout(resizeTimer)
+		resizeTimer = setTimeout(() => {
+			if (destroyed || !booted) return
+			const w = Math.round(container.getBoundingClientRect().width)
+			if (w === lastResizeW) return
+			lastResizeW = w
+			render(false)
+		}, 200)
+	}
 	window.addEventListener('resize', onResize)
 
 	// ── public instance ──
@@ -578,7 +618,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		get text() { return text },
 		setText(next: string): void {
 			if (destroyed) return
-			if (!booted) { text = next ?? ''; return }
+			if (!booted) { text = next ?? ''; if (editInput) editInput.value = text; return }
 			commitText(next, false)
 		},
 		replay(): void {
@@ -591,37 +631,39 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		},
 		update(partial: Partial<ThreadTextOptions>): void {
 			if (destroyed) return
+			if (partial.text !== undefined) { api.setText(partial.text); }   // text is not a live "instant" field — route it
 			let geom = false, spritesOnly = false
 			if (partial.font !== undefined && partial.font !== font) { font = partial.font; primaryFamily = primaryOf(font); geom = true }
-			if (partial.weight !== undefined && partial.weight !== weight) { weight = partial.weight; geom = true }
-			if (partial.fill !== undefined && partial.fill !== fill) { fill = partial.fill; geom = true }
+			if (partial.weight !== undefined) { const w = clamp(partial.weight, 1, 1000); if (w !== weight) { weight = w; geom = true } }
+			if (partial.fill !== undefined) { const f = clamp(partial.fill, 0.05, 1); if (f !== fill) { fill = f; geom = true } }
 			if (partial.pitch !== undefined && partial.pitch !== pitchOpt) { pitchOpt = partial.pitch; geom = true }
 			if (partial.threadColor !== undefined) { setThreadRamp(partial.threadColor); spritesOnly = true }
-			if (partial.sewRate !== undefined) sewRate = partial.sewRate
+			if (partial.sewRate !== undefined) sewRate = Math.max(1, partial.sewRate)
 			if (partial.animate !== undefined) animate = partial.animate
 			if (partial.onTextChange !== undefined) onTextChange = partial.onTextChange
 			if (partial.sheen !== undefined) applySheen(partial.sheen)
-			if (partial.editable !== undefined && partial.editable !== editable) applyEditable(partial.editable)
+			if (partial.editable !== undefined) applyEditable(partial.editable)
 			if (!booted) return
 			if (geom) whenFontReady(primaryFamily, weight, () => { if (!destroyed) render(false) })
-			else if (spritesOnly) { buildSprites(); resetBg(); drawAll(); updateCaret() }
-			sheenDirty = true
+			else if (spritesOnly) { buildSprites(); resetBg(); drawAll(); updateCaret(); kick() }
 		},
-		focus(): void { if (!destroyed && editable) container.focus() },
+		focus(): void { if (!destroyed && editable) editInput?.focus() },
 		destroy(): void {
 			if (destroyed) return
 			destroyed = true
+			running = false
 			cancelAnimationFrame(rafId)
 			clearTimeout(resizeTimer)
-			if (fontTimer) clearTimeout(fontTimer)
+			for (const t of fontTimers) clearTimeout(t)
+			fontTimers.clear()
 			window.removeEventListener('resize', onResize)
-			window.removeEventListener('pointermove', onPointerMove)
-			if (editable) applyEditable(false)
+			container.removeEventListener('pointermove', onPointerMove)
+			container.removeEventListener('pointerleave', onPointerLeave)
 			for (const c of created) c.remove()
 			SPRITES = []; STITCHES = []; anim.rows = []
 			MASK = new Uint8Array(0); SHADE = new Float32Array(0)
 			EX = new Float32Array(0); EY = new Float32Array(0)
-			MASKCV = OFFCV = null; OFFCTX = null; caretEl = null
+			MASKCV = OFFCV = null; OFFCTX = null; caretEl = null; editInput = null
 		},
 	}
 	return api

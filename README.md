@@ -2,12 +2,12 @@
 
 **Render any text as photorealistic, procedural satin-stitch embroidery — in real time, in the browser, from the font's actual glyph geometry.**
 
-> Status: **in-progress.** The framework-agnostic core (`createThreadText`) + React
-> hook/component are now extracted, typed, tested, and building to ESM/CJS/`.d.ts`. Still
-> to come: Framer/Webflow bindings and the landing site (and a free-licensed demo font).
-> The original reference renderer lives in [`demo/index.html`](./demo/index.html) and stays
-> the visual oracle. See [`HANDOFF.md`](./HANDOFF.md) for what's left; tool-build conventions
-> are in the monorepo [`../GUIDE.md`](../GUIDE.md).
+> Status: **shipped.** Published to npm (`@liiift-studio/threadtext`) with a framework-agnostic
+> core (`createThreadText`), a React hook + component, Framer and Webflow ports, tests, and a
+> live landing site at [threadtext.com](https://threadtext.com) (demo font: the OFL Fraunces
+> variable). The original single-file reference renderer lives in
+> [`demo/index.html`](./demo/index.html) as the visual oracle; tool-build conventions are in the
+> monorepo [`../GUIDE.md`](../GUIDE.md).
 
 Homepage: [threadtext.com](https://threadtext.com) · npm: `@liiift-studio/threadtext`
 
@@ -58,10 +58,12 @@ const thread = createThreadText(document.getElementById('host'), {
   weight: 680,
 })
 
-thread.setText('Threads') // appended letters sew in; unrelated text re-sews the word
-thread.replay()           // re-run the full sew-in
-thread.resize()           // re-fit to the container
-thread.destroy()          // cancel rAF, remove listeners, free canvases
+thread.setText('Threads')           // re-fit to width and redraw instantly (no sew-in)
+thread.update({ threadColor: '#e6c200', fill: 0.8 }) // live changes — instant, no re-sew
+thread.replay()                     // re-run the sew-in animation
+thread.resize()                     // re-fit to the container
+thread.focus()                      // focus the surface for typing (editable mode)
+thread.destroy()                    // cancel rAF, remove listeners, free canvases
 ```
 
 React:
@@ -74,13 +76,17 @@ import { ThreadText } from '@liiift-studio/threadtext'
 
 Thread colour, `fill` (size — the word re-fits to the container width on load/resize),
 `weight`, `font`, `sewRate`, `sheen`, `animate`, and `editable` (type straight on the
-artwork) are all options — see `ThreadTextOptions`. Change any of them live with
+artwork — backed by a real input, so touch keyboards and IME work) with an `onTextChange`
+callback are all options — see `ThreadTextOptions`. Change any of them live with
 `instance.update(...)` — it redraws instantly, never re-running the sew-in. `react`/`react-dom`
 are optional peers; the core is framework-free.
 
 ## What's next
 
-The renderer is proven. Finishing it means productionising per [`../GUIDE.md`](../GUIDE.md): extract a framework-agnostic **core** with a typed API, add the **React hook + component**, **Framer** + **Webflow** bindings, tests, a landing **site**, then ship (npm + Vercel). A proposed core API and step-by-step plan are in `HANDOFF.md`.
+Now shipped. Remaining ideas (see `HANDOFF.md`): region-limit or move the per-keystroke geometry
+rebuild to a Web Worker/WASM (it currently re-runs the full distance-transform pipeline on every
+edit); real variable-font axis control (`opsz`/`wght`) via path-based glyph rendering, since canvas
+`fillText` can't set `font-variation-settings`; and additional stitch modes (chain, cross, running).
 
 ---
 

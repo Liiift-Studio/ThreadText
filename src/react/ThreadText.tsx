@@ -36,13 +36,15 @@ export const ThreadText = forwardRef<HTMLElement, ThreadTextProps>(
 			[innerRef, forwardedRef],
 		)
 
+		// In editable mode the renderer adds a real <input> as the accessible control, so the
+		// container must NOT carry role="img" (it would hide the input from assistive tech).
 		return (
 			<Tag
 				ref={mergedRef as React.Ref<HTMLElement>}
 				className={className}
 				style={style}
-				role={role ?? 'img'}
-				aria-label={ariaLabel ?? options.text}
+				role={options.editable ? role : (role ?? 'img')}
+				aria-label={options.editable ? ariaLabel : (ariaLabel ?? options.text)}
 				aria-describedby={ariaDescribedby}
 			/>
 		)

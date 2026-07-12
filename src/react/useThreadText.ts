@@ -39,10 +39,14 @@ export function useThreadText(options: ThreadTextOptions) {
 
 		let rafId = 0
 		let lastWidth = 0
+		let firstObs = true
 		let ro: ResizeObserver | undefined
 		if (typeof ResizeObserver !== 'undefined') {
 			ro = new ResizeObserver((entries) => {
 				const w = Math.round(entries[0].contentRect.width)
+				// Skip the observer's initial callback — the instance sized itself on create;
+				// re-fitting here would wipe the mount sew-in animation.
+				if (firstObs) { firstObs = false; lastWidth = w; return }
 				if (w === lastWidth) return
 				lastWidth = w
 				cancelAnimationFrame(rafId)

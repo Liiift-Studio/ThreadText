@@ -127,25 +127,34 @@ describe('createThreadText', () => {
 		expect(after[0]).toBe(before[0])
 	})
 
-	it('editable makes the surface focusable and typeable', () => {
+	it('editable creates a real input control + caret; removing it tears down', () => {
 		inst = createThreadText(host, { text: 'Type' })
 		inst.update({ editable: true })
-		expect(host.getAttribute('role')).toBe('textbox')
-		expect(host.getAttribute('tabindex')).toBe('0')
+		const input = host.querySelector('input')
+		expect(input).toBeTruthy()
+		expect(input?.getAttribute('aria-label')?.toLowerCase()).toContain('type')
+		expect(input?.value).toBe('Type')
 		expect(host.querySelector('.' + THREAD_TEXT_CLASSES.caret)).toBeTruthy()
 		expect(() => inst!.focus()).not.toThrow()
 		inst.update({ editable: false })
-		expect(host.getAttribute('role')).toBeNull()
+		expect(host.querySelector('input')).toBeNull()
 	})
 
-	it('editable + onTextChange fires on typed edits', () => {
+	it('editable + onTextChange fires on typed edits via the input', () => {
 		let latest = ''
 		inst = createThreadText(host, { text: 'Go', editable: true, onTextChange: (t) => { latest = t } })
-		host.dispatchEvent(Object.assign(new Event('keydown'), { key: 'x', preventDefault() {} }))
+		const input = host.querySelector('input') as HTMLInputElement
+		expect(input).toBeTruthy()
+		input.value = 'Gox'
+		input.dispatchEvent(new Event('input'))
 		expect(inst.text).toBe('Gox')
 		expect(latest).toBe('Gox')
-		host.dispatchEvent(Object.assign(new Event('keydown'), { key: 'Backspace', preventDefault() {} }))
-		expect(inst.text).toBe('Go')
+	})
+
+	it('clamps out-of-range fill and weight without throwing', () => {
+		inst = createThreadText(host, { text: 'Hi', fill: 5, weight: 9999 })
+		expect(host.querySelectorAll('canvas').length).toBe(2)
+		expect(() => inst!.update({ fill: -3, weight: 0 })).not.toThrow()
 	})
 
 	it('replay and resize do not throw', () => {

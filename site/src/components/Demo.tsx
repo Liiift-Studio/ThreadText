@@ -65,9 +65,18 @@ export default function Demo() {
 		})
 		instRef.current = inst
 
-		let raf = 0
+		let raf = 0, lastW = 0, first = true
 		const ro = typeof ResizeObserver !== 'undefined'
-			? new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => instRef.current?.resize()) })
+			? new ResizeObserver((entries) => {
+				const w = Math.round(entries[0].contentRect.width)
+				// Skip the observer's initial callback — the instance already sized itself on
+				// create; re-fitting here would wipe the mount sew-in. Then only react to real
+				// width changes (height is driven by the renderer itself).
+				if (first) { first = false; lastW = w; return }
+				if (w === lastW) return
+				lastW = w
+				cancelAnimationFrame(raf); raf = requestAnimationFrame(() => instRef.current?.resize())
+			})
 			: undefined
 		ro?.observe(el)
 
@@ -97,17 +106,17 @@ export default function Demo() {
 					<input
 						type="text"
 						value={text}
-						maxLength={14}
+						maxLength={24}
 						aria-label="Word to embroider"
 						onChange={e => setText(e.target.value)}
 						className="bg-transparent border rounded-lg px-3 py-2 text-base"
-						style={{ borderColor: 'currentColor', fontFamily: font }}
+						style={{ borderColor: 'currentColor', fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}
 					/>
 				</label>
 				<label className="flex flex-col gap-1">
 					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Font</span>
 					<select value={font} aria-label="Font" onChange={e => setFont(e.target.value)} className="bg-transparent border rounded-lg px-3 py-2 text-base" style={{ borderColor: 'currentColor' }}>
-						{FONTS.map(f => <option key={f.label} value={f.value} style={{ color: '#111' }}>{f.label}</option>)}
+						{FONTS.map(f => <option key={f.label} value={f.value} style={{ color: '#111', background: '#fff' }}>{f.label}</option>)}
 					</select>
 				</label>
 				<button

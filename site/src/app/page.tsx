@@ -77,7 +77,7 @@ export default function Home() {
 					</div>
 					<div className="flex flex-col gap-3">
 						<p className="font-semibold text-base">Sewn in, one row at a time</p>
-						<p>A breadth-first pass over the stitch graph reveals the word one satin cross-row at a time — the needle following each stroke, letters filling left to right. Typing re-embroiders and animates only the newly-added letters.</p>
+						<p>A breadth-first pass over the stitch graph reveals the word one satin cross-row at a time — the needle following each stroke, letters filling left to right. The sew-in plays on load and whenever you hit Replay; typing and every live control re-fit and redraw the word instantly.</p>
 					</div>
 					<div className="flex flex-col gap-3">
 						<p className="font-semibold text-base">Accessibility &amp; motion</p>
@@ -139,7 +139,8 @@ thread.destroy()          // cancel rAF, remove listeners, free canvases`} />
 								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">sewRate</td><td className="py-2 pr-6">110</td><td className="py-2">Satin cross-rows laid per second during the sew-in.</td></tr>
 								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">sheen</td><td className="py-2 pr-6">true</td><td className="py-2">Cursor-following radial sheen on the overlay canvas.</td></tr>
 								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">animate</td><td className="py-2 pr-6">true</td><td className="py-2">Play the sew-in on mount and on replay(). When false (or reduced-motion), the word is drawn instantly.</td></tr>
-								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">editable</td><td className="py-2 pr-6">false</td><td className="py-2">Make the surface focusable and typeable — click to focus, type to edit, Backspace to delete, Enter to replay. Shows a caret; pair with onTextChange.</td></tr>
+								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">editable</td><td className="py-2 pr-6">false</td><td className="py-2">Make the surface typeable — adds a real (transparent) input over the artwork, so clicking focuses it, the soft keyboard opens on touch, and typing/paste/IME all work. Enter replays. Shows a caret; pair with onTextChange.</td></tr>
+								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">onTextChange</td><td className="py-2 pr-6">—</td><td className="py-2">Callback fired with the new text whenever the user edits it in editable mode.</td></tr>
 								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">reducedMotion</td><td className="py-2 pr-6">auto</td><td className="py-2">Force reduced-motion. Auto-detected from prefers-reduced-motion if omitted.</td></tr>
 							</tbody>
 						</table>
