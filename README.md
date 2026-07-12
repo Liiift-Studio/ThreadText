@@ -75,8 +75,8 @@ import { ThreadText } from '@liiift-studio/threadtext'
 ```
 
 Thread colour, `fill` (size — the word re-fits to the container width on load/resize),
-`weight`, `font`, `sewStyle` (`'machine'` satin rows or `'hand'` — a single thread that
-wanders stitch by stitch), `sewRate`, `sheen`, `animate`, and `editable` (type straight on
+`weight`, `font`, `sewStyle` (`'machine'` satin rows in parallel, or `'hand'` — one letter at
+a time, longest threads first), `sewRate`, `sheen`, `animate`, and `editable` (type straight on
 the artwork — backed by a real input, so touch keyboards and IME work) with an `onTextChange`
 callback are all options — see `ThreadTextOptions`. Change any of them live with
 `instance.update(...)` — it redraws instantly, never re-running the sew-in. `react`/`react-dom`

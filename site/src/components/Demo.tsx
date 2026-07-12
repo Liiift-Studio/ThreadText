@@ -162,7 +162,7 @@ export default function Demo() {
 								key={v}
 								onClick={() => setSewStyle(v)}
 								aria-pressed={sewStyle === v}
-								title={v === 'machine' ? 'Satin cross-rows fill each stroke in parallel — like a machine' : 'A single thread wanders stitch by stitch — like hand embroidery'}
+								title={v === 'machine' ? 'Satin cross-rows fill each stroke in parallel — like a machine' : 'One letter at a time, longest threads first — like hand embroidery'}
 								className="text-xs px-3 py-2 rounded-full border transition-opacity"
 								style={{ borderColor: 'currentColor', opacity: sewStyle === v ? 1 : 0.5, background: sewStyle === v ? 'var(--btn-bg)' : 'transparent' }}
 							>
