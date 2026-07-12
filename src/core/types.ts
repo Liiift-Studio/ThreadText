@@ -34,9 +34,9 @@ export interface ThreadTextOptions {
 	 * How the word is sewn in:
 	 * - **'machine'** (default) — satin cross-rows appear in parallel across each stroke, like
 	 *   machine embroidery (a BFS over the stitch graph).
-	 * - **'hand'** — works one letter at a time (left to right), laying the longest threads
-	 *   (the widest satin cross-rows) first, then the thin serifs and terminals — the way a
-	 *   person establishes the body of a shape before the details.
+	 * - **'hand'** — works one letter at a time (left to right). Within each letter it enters at
+	 *   the widest region near the top and works its way down the strokes, then cleans up the thin
+	 *   serifs and terminals last — the way a person embroiders a shape.
 	 */
 	sewStyle?: 'machine' | 'hand'
 	/** Satin cross-rows (machine) or stitches (hand) laid per second during the sew-in. (default: 110) */

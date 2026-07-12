@@ -455,19 +455,26 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		return comps
 	}
 	/**
-	 * Hand sew order: work one letter at a time (left → right), and within each letter lay the
-	 * longest threads first — the widest satin cross-rows fill before the thin serifs/terminals,
-	 * the way a person establishes the body of a shape before the details. Each row is a thread.
+	 * Hand sew order: work one letter at a time (left → right). Within each letter, separate the
+	 * satin cross-rows into the "body" (wide threads — the substance of the strokes) and the thin
+	 * "edges" (serifs, terminals, hairline curves). Lay the body top-to-bottom — so the thread
+	 * enters at the widest region near the top and works its way down the shape — then clean up
+	 * the thin edges last. Each row is one thread.
 	 */
 	function buildHandOrder(subset: Stitch[]): Stitch[][] {
 		if (!subset.length) return []
 		const minX = (c: Stitch[]) => { let m = Infinity; for (const s of c) if (s.x < m) m = s.x; return m }
+		const meanY = (r: Stitch[]) => { let s = 0; for (const st of r) s += st.y; return s / r.length }
 		const comps = letterComponents(subset).sort((a, b) => minX(a) - minX(b))   // one letter at a time
 		const out: Stitch[][] = []
 		for (const comp of comps) {
-			const rows = buildSewRows(comp)                    // satin cross-rows for this letter
-			rows.sort((a, b) => b.length - a.length)           // longest threads / widest cross-sections first
-			for (const r of rows) out.push(r)
+			const rows = buildSewRows(comp)                    // satin cross-rows (threads) for this letter
+			let maxLen = 1; for (const r of rows) if (r.length > maxLen) maxLen = r.length
+			const edgeCut = Math.max(2, maxLen * 0.45)         // rows thinner than this read as edges (serifs/terminals)
+			const body = rows.filter((r) => r.length >= edgeCut).sort((a, b) => meanY(a) - meanY(b))  // enter at the top of the body, work down
+			const edges = rows.filter((r) => r.length < edgeCut).sort((a, b) => meanY(a) - meanY(b))  // then clean up the thin edges
+			for (const r of body) out.push(r)
+			for (const r of edges) out.push(r)
 		}
 		return out
 	}
