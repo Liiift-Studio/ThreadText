@@ -7,11 +7,13 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import { createThreadText } from "@liiift-studio/threadtext"
 import type { ThreadTextInstance } from "@liiift-studio/threadtext"
 
-/** Curated set of loaded / system faces that embroider well. */
+/** A spread of type styles (labelled by category, not by name) — each embroiders differently. */
 const FONTS = [
-	{ label: "Fraunces", value: '"Fraunces", Georgia, serif' },
-	{ label: "Merriweather", value: 'Merriweather, Georgia, serif' },
-	{ label: "Georgia", value: "Georgia, serif" },
+	{ label: "Display serif", value: '"Fraunces", Georgia, serif' },
+	{ label: "Text serif", value: 'Merriweather, Georgia, serif' },
+	{ label: "Sans-serif", value: 'ui-sans-serif, system-ui, "Helvetica Neue", Arial, sans-serif' },
+	{ label: "Monospace", value: 'ui-monospace, Menlo, Consolas, "Courier New", monospace' },
+	{ label: "Handwriting", value: '"Snell Roundhand", "Segoe Script", "Brush Script MT", cursive' },
 ]
 
 /** Labelled range slider with the value announced to screen readers. */
@@ -49,9 +51,8 @@ export default function Demo() {
 	const [sewRate, setSewRate] = useState(140)
 	const [threadColor, setThreadColor] = useState("#fdf3df")
 	const [sheen, setSheen] = useState(true)
-	const [animate, setAnimate] = useState(true)
 
-	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, sheen, animate })
+	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, sheen })
 
 	// Create once; everything below is applied live.
 	useEffect(() => {
@@ -76,8 +77,8 @@ export default function Demo() {
 
 	// Live parameter changes — instant redraw, no re-sew.
 	useEffect(() => {
-		instRef.current?.update({ font, weight, fill, sewRate, threadColor, sheen, animate })
-	}, [font, weight, fill, sewRate, threadColor, sheen, animate])
+		instRef.current?.update({ font, weight, fill, sewRate, threadColor, sheen })
+	}, [font, weight, fill, sewRate, threadColor, sheen])
 
 	// Text changes (input or canvas typing).
 	useEffect(() => { instRef.current?.setText(text) }, [text])
@@ -123,8 +124,7 @@ export default function Demo() {
 			<div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
 				<Slider label="Size" value={fill} min={0.4} max={1} step={0.02} fmt={v => `${Math.round(v * 100)}%`} onChange={setFill} title="Fraction of the width the word fills — refits to the container on resize" />
 				<Slider label="Weight" value={weight} min={200} max={900} step={10} onChange={setWeight} title="Numeric font weight — heavier strokes give broader satin bands" />
-				<Slider label="Sew rate" value={sewRate} min={30} max={320} step={10} fmt={v => `${v}/s`} onChange={setSewRate} title="Satin cross-rows laid per second during the sew-in" />
-				<Toggle label="Sew-in" on={animate} onClick={() => setAnimate(v => !v)} title="Whether the word animates in one stitch at a time (Replay to see it)" />
+				<Slider label="Sew rate" value={sewRate} min={30} max={320} step={10} fmt={v => `${v}/s`} onChange={setSewRate} title="How fast the sew-in animation lays rows — hit Replay to watch it" />
 				<Toggle label="Sheen" on={sheen} onClick={() => setSheen(v => !v)} title="Cursor-following highlight that turns the threads over in the light" />
 				<label className="flex flex-col gap-1">
 					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Thread</span>
@@ -137,7 +137,7 @@ export default function Demo() {
 
 			<p className="text-xs text-muted italic" style={{ lineHeight: 1.8 }}>
 				Click the artwork and type — the word re-fits to the width as you go, and colour, font, and size
-				change live without re-stitching. Toggle <em>Sew-in</em> and hit <em>Replay</em> to watch it embroider one satin row at a time.
+				change live without re-stitching. Hit <em>Replay sew-in</em> to watch it embroider itself one satin row at a time.
 			</p>
 		</div>
 	)

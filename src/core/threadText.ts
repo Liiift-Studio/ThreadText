@@ -466,7 +466,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		if (!lastTS) lastTS = ts
 		const dt = Math.min(0.25, (ts - lastTS) / 1000); lastTS = ts   // catch-up on throttled frames → wall-clock-paced reveal
 		if (anim.on) { anim.acc += anim.rate * dt; drawRowsTo(anim.acc); if (anim.idx >= anim.rows.length) anim.on = false }
-		if (sheenDirty && MASKCV) { drawSheen(sheen.set ? sheen.x : W * 0.5, sheen.set ? sheen.y : H * 0.34); sheenDirty = false }
+		if (sheenDirty && MASKCV) { drawSheen(sheen.set ? sheen.x : W * 0.5, sheen.set ? sheen.y : H * 0.45); sheenDirty = false }
 		if (caretEl) caretEl.style.opacity = (editable && focused && (Math.floor(ts / 530) % 2 === 0)) ? '1' : '0'
 		rafId = requestAnimationFrame(loop)
 	}
@@ -516,8 +516,14 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	function applySheen(on: boolean): void {
 		if (on === sheenOn) return
 		sheenOn = on
-		if (on) { window.addEventListener('pointermove', onPointerMove, { passive: true }); sheenDirty = true }
-		else { window.removeEventListener('pointermove', onPointerMove); const c = fxC.getContext('2d'); if (c) c.clearRect(0, 0, W, H) }
+		if (on) {
+			window.addEventListener('pointermove', onPointerMove, { passive: true })
+			sheen.set = false     // show a centred resting glow until the cursor moves over the art
+			sheenDirty = true
+		} else {
+			window.removeEventListener('pointermove', onPointerMove)
+			const c = fxC.getContext('2d'); if (c) c.clearRect(0, 0, W, H)   // clear immediately
+		}
 	}
 
 	// ── full render: fit to width, rebuild geometry, then sew or draw instantly ──
