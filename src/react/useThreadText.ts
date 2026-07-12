@@ -1,4 +1,4 @@
-// threadText/src/react/useThreadText.ts — React hook: instance lifecycle + text delta routing
+// threadText/src/react/useThreadText.ts — React hook: instance lifecycle + live updates
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { createThreadText } from '../core/threadText'
 import type { ThreadTextInstance, ThreadTextOptions } from '../core/types'
@@ -6,10 +6,11 @@ import type { ThreadTextInstance, ThreadTextOptions } from '../core/types'
 /**
  * React hook that mounts a threadText renderer inside a ref'd container.
  *
- * The instance is (re)created only when a *structural* option changes (font, weight,
- * colours, pitch, sizing, motion). Changing just `text` routes through
- * `instance.setText()` so appended letters animate in without a full remount.
- * Re-fits to the container via ResizeObserver and tears down on unmount.
+ * The instance is created once and kept alive; option changes (font, weight, colour,
+ * size, sew rate, sheen, editability) are applied live via `instance.update()` — no
+ * remount, no re-sew. Text changes route through `setText`. The surface re-fits to the
+ * container width via ResizeObserver, and tears down on unmount. Only `reducedMotion`
+ * (fixed at creation) forces a fresh instance.
  *
  * @param options - {@link ThreadTextOptions} for the renderer.
  * @returns A ref to attach to the target container element.
@@ -19,18 +20,21 @@ export function useThreadText(options: ThreadTextOptions) {
 	const instanceRef = useRef<ThreadTextInstance | null>(null)
 	const optionsRef = useRef(options)
 	optionsRef.current = options
+	const onTextChangeRef = useRef(options.onTextChange)
+	onTextChangeRef.current = options.onTextChange
 
-	const { text, font, weight, threadColor, fabricColor, pitch, animate, sewRate, sheen, reducedMotion, aspect } = options
+	const { text, font, weight, threadColor, pitch, fill, animate, sewRate, sheen, editable, reducedMotion } = options
 
-	// Structural key — everything *except* text. A change here forces a fresh instance.
-	const structuralKey = JSON.stringify({ font, weight, threadColor, fabricColor, pitch, animate, sewRate, sheen, reducedMotion, aspect })
-
-	// (Re)create the instance when structural options change or on mount.
+	// (Re)create only when reducedMotion changes (it's fixed at construction) or on mount.
 	useLayoutEffect(() => {
 		const el = ref.current
 		if (!el) return
 
-		const instance = createThreadText(el, optionsRef.current)
+		const instance = createThreadText(el, {
+			...optionsRef.current,
+			// Stable callback wrapper so typing edits always reach the latest handler.
+			onTextChange: (t) => onTextChangeRef.current?.(t),
+		})
 		instanceRef.current = instance
 
 		let rafId = 0
@@ -54,9 +58,14 @@ export function useThreadText(options: ThreadTextOptions) {
 			instanceRef.current = null
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [structuralKey])
+	}, [reducedMotion])
 
-	// Route text-only changes through setText so the delta animates in place.
+	// Live option changes → update() (instant redraw, never a re-sew).
+	useEffect(() => {
+		instanceRef.current?.update({ font, weight, threadColor, pitch, fill, animate, sewRate, sheen, editable })
+	}, [font, weight, threadColor, pitch, fill, animate, sewRate, sheen, editable])
+
+	// Text changes → setText.
 	useEffect(() => {
 		instanceRef.current?.setText(text)
 	}, [text])

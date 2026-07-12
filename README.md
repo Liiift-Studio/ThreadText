@@ -15,7 +15,7 @@ Homepage: [threadtext.com](https://threadtext.com) · npm: `@liiift-studio/threa
 
 ## What it is
 
-Give it a word set in any loaded (variable) font and it renders it as **raised white satin floss on woven fabric** — threads that run *across* each stroke and fan around the curves, lifted into 3D, seated with a contact shadow, and sewn in one satin stitch at a time. It's photorealistic **by construction** (real thread geometry + lighting), not a raster filter and not an AI image.
+Give it a word set in any loaded (variable) font and it renders it as **raised satin floss on a transparent ground** — threads that run *across* each stroke and fan around the curves, lifted into 3D, and sewn in one satin stitch at a time. Drop it over any background. It's photorealistic **by construction** (real thread geometry + lighting), not a raster filter and not an AI image.
 
 ## Why it's worth building (the niche is empty)
 
@@ -44,7 +44,7 @@ Type to embroider a new word · Backspace to unpick · Enter to replay the sew-i
 
 ## How it works (one paragraph)
 
-Rasterise the glyphs → compute a signed-distance field → derive a **flow field** (smoothed in double-angle orientation space so opposite edge-normals reinforce) so threads run across each stroke → lay thousands of discrete pre-shaded **thread sprites** oriented by the flow → lift to 3D with a dome-shade/normal map → seat on procedural woven fabric with a contact shadow → **sew it in** one BFS cross-row at a time (the needle follows the stroke) → a subtle cursor-driven sheen. Full walkthrough with line references in `HANDOFF.md`.
+Rasterise the glyphs → compute a signed-distance field → derive a **flow field** (smoothed in double-angle orientation space so opposite edge-normals reinforce) so threads run across each stroke → lay thousands of discrete pre-shaded **thread sprites** oriented by the flow → lift to 3D with a dome-shade/normal map on a transparent ground → **sew it in** one BFS cross-row at a time (the needle follows the stroke) → a subtle cursor-driven sheen. Full walkthrough with line references in `HANDOFF.md`.
 
 ## Use it (extracted API)
 
@@ -72,9 +72,11 @@ import { ThreadText } from '@liiift-studio/threadtext'
 <ThreadText text="Thread" font='"Your Font", serif' weight={680} />
 ```
 
-Colours (`threadColor`, `fabricColor`), thread `pitch`, `sewRate`, `sheen`, `animate`, and
-`reducedMotion` are all options — see `ThreadTextOptions`. `react`/`react-dom` are optional
-peers; the core is framework-free.
+Thread colour, `fill` (size — the word re-fits to the container width on load/resize),
+`weight`, `font`, `sewRate`, `sheen`, `animate`, and `editable` (type straight on the
+artwork) are all options — see `ThreadTextOptions`. Change any of them live with
+`instance.update(...)` — it redraws instantly, never re-running the sew-in. `react`/`react-dom`
+are optional peers; the core is framework-free.
 
 ## What's next
 

@@ -27,12 +27,12 @@ const INSTANCES = new WeakMap<HTMLElement, Instance>()
  *   data-tt-font          — CSS font-family of a loaded font
  *   data-tt-weight        — numeric font weight (100–900)
  *   data-tt-thread-color  — floss colour (hex or rgb())
- *   data-tt-fabric-color  — woven-ground base colour
  *   data-tt-pitch         — thread spacing in px
+ *   data-tt-fill          — fraction of the width the word fills (its size)
  *   data-tt-sew-rate      — satin rows per second
- *   data-tt-aspect        — height ÷ width of the render surface
  *   data-tt-sheen         — "false" to disable the cursor sheen
  *   data-tt-animate       — "false" to draw instantly (no sew-in)
+ *   data-tt-editable      — "true" to make the word typeable
  *
  * @param el - The opted-in element
  * @param fallbackText - Text to use when data-tt-text is absent
@@ -44,12 +44,12 @@ function readOptions(el: HTMLElement, fallbackText: string): ThreadTextOptions {
 	if (d.ttFont) opts.font = d.ttFont
 	if (d.ttWeight !== undefined) { const n = parseFloat(d.ttWeight); if (!isNaN(n)) opts.weight = n }
 	if (d.ttThreadColor) opts.threadColor = d.ttThreadColor
-	if (d.ttFabricColor) opts.fabricColor = d.ttFabricColor
 	if (d.ttPitch !== undefined) { const n = parseFloat(d.ttPitch); if (!isNaN(n)) opts.pitch = n }
+	if (d.ttFill !== undefined) { const n = parseFloat(d.ttFill); if (!isNaN(n)) opts.fill = n }
 	if (d.ttSewRate !== undefined) { const n = parseFloat(d.ttSewRate); if (!isNaN(n)) opts.sewRate = n }
-	if (d.ttAspect !== undefined) { const n = parseFloat(d.ttAspect); if (!isNaN(n)) opts.aspect = n }
 	if (d.ttSheen === 'false') opts.sheen = false
 	if (d.ttAnimate === 'false') opts.animate = false
+	if (d.ttEditable === 'true') opts.editable = true
 
 	return opts
 }

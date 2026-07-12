@@ -34,6 +34,20 @@
 - [x] Verified: `next build` clean (TS + static gen); `next start` serves 200 with correct
   title/OG(png)/sitemap/icon; no SSR errors.
 
+## v0.1.0 — behaviour changes (2026-07-12)
+- Removed the woven **fabric** ground and the **contact shadow** — threads now render on a
+  **transparent** ground (drop over any background). `resetBg()` just clears; no FABRIC_CV/SHADOWCV.
+- **Colour/size/font/weight changes no longer re-sew** — new `instance.update(partial)` applies
+  option changes with an instant redraw. Sew-in animation now only on mount + `replay()`.
+- **Sew-in is optional** (`animate`), toggleable live via `update({ animate })`.
+- **Editable/typeable**: `editable` option makes the surface focusable + typeable (caret, Backspace,
+  Enter=replay) with an `onTextChange` callback. Added `THREAD_TEXT_CLASSES.caret` + `instance.focus()`.
+- **Fit-to-width**: replaced the fixed 0.46 aspect with adaptive sizing — the word fits
+  `fill × containerWidth` (default 0.9, "a bit of padding") on load/resize/any change; canvas
+  height derives from the glyph extent. New `fill` option (the size); removed `aspect`/`fabricColor`.
+- Demo rewritten: font selector, size slider, animate/sheen toggles, live colour, type-on-canvas.
+- 17 tests pass (added update/editable coverage). lint clean; package + site + webflow builds green.
+
 ## Left to build (see ../HANDOFF.md)
 - [ ] `vercel.json`, `.claude/`, and the shared site-kit files (via parent `npm run sync`).
 - [ ] Landing site (Next.js) with a free-licensed demo font.

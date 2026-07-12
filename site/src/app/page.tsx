@@ -72,8 +72,8 @@ export default function Home() {
 						<p>The word is rasterised, then an exact distance transform gives a flow field — smoothed in double-angle orientation space so opposite edge-normals reinforce. Threads run <em>across</em> each stroke and fan cleanly around the curves, with no moir&eacute;.</p>
 					</div>
 					<div className="flex flex-col gap-3">
-						<p className="font-semibold text-base">Thread, lit and seated</p>
-						<p>Thousands of pre-shaded thread sprites are laid along the flow, lifted into 3D by a dome-shade normal map, and seated on procedural woven fabric with a contact shadow. A cursor-following sheen turns the threads over in the light.</p>
+						<p className="font-semibold text-base">Thread, lit in 3D</p>
+						<p>Thousands of pre-shaded thread sprites are laid along the flow and lifted into 3D by a dome-shade normal map, so each strand catches the light along its length. The floss sits on a transparent ground — drop it over any background — and a cursor-following sheen turns the threads over as you move.</p>
 					</div>
 					<div className="flex flex-col gap-3">
 						<p className="font-semibold text-base">Sewn in, one row at a time</p>
@@ -133,14 +133,14 @@ thread.destroy()          // cancel rAF, remove listeners, free canvases`} />
 								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">text</td><td className="py-2 pr-6">—</td><td className="py-2">The word (or short phrase) to embroider. Required.</td></tr>
 								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">font</td><td className="py-2 pr-6">&apos;Georgia, serif&apos;</td><td className="py-2">CSS font-family of an already-loaded font. The glyph geometry drives the stitch flow — load it however you like before calling.</td></tr>
 								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">weight</td><td className="py-2 pr-6">680</td><td className="py-2">Numeric font weight (100–900).</td></tr>
-								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">threadColor</td><td className="py-2 pr-6">&apos;#fffbf3&apos;</td><td className="py-2">Floss colour — the lit crest of each thread. Hex or rgb().</td></tr>
-								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">fabricColor</td><td className="py-2 pr-6">&apos;#08080a&apos;</td><td className="py-2">Woven-ground base colour — the outer edge of the fabric.</td></tr>
-								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">pitch</td><td className="py-2 pr-6">auto</td><td className="py-2">Thread spacing in px. Smaller = finer, denser stitching (and more work). Derived from height if unset.</td></tr>
+								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">threadColor</td><td className="py-2 pr-6">&apos;#fffbf3&apos;</td><td className="py-2">Floss colour — the lit crest of each thread. Hex or rgb(). Changes live, no re-stitch.</td></tr>
+								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">fill</td><td className="py-2 pr-6">0.9</td><td className="py-2">Fraction of the container width the word spans — its size. The word re-fits to width (with the remainder as padding) on load and resize.</td></tr>
+								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">pitch</td><td className="py-2 pr-6">auto</td><td className="py-2">Thread spacing in px. Smaller = finer, denser stitching (and more work). Derived from the fitted height if unset.</td></tr>
 								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">sewRate</td><td className="py-2 pr-6">110</td><td className="py-2">Satin cross-rows laid per second during the sew-in.</td></tr>
 								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">sheen</td><td className="py-2 pr-6">true</td><td className="py-2">Cursor-following radial sheen on the overlay canvas.</td></tr>
-								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">animate</td><td className="py-2 pr-6">true</td><td className="py-2">Play the sew-in animation on mount. When false (or reduced-motion), the word is drawn instantly.</td></tr>
+								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">animate</td><td className="py-2 pr-6">true</td><td className="py-2">Play the sew-in on mount and on replay(). When false (or reduced-motion), the word is drawn instantly.</td></tr>
+								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">editable</td><td className="py-2 pr-6">false</td><td className="py-2">Make the surface focusable and typeable — click to focus, type to edit, Backspace to delete, Enter to replay. Shows a caret; pair with onTextChange.</td></tr>
 								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">reducedMotion</td><td className="py-2 pr-6">auto</td><td className="py-2">Force reduced-motion. Auto-detected from prefers-reduced-motion if omitted.</td></tr>
-								<tr className="border-t border-foreground/10 hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">aspect</td><td className="py-2 pr-6">0.46</td><td className="py-2">Height ÷ width of the render surface when a container creates its own canvases.</td></tr>
 							</tbody>
 						</table>
 					</div>

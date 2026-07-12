@@ -3,12 +3,11 @@
 // Discrete pre-shaded thread sprites are laid on a flow field derived from the font's
 // glyph geometry (an exact Euclidean distance transform, smoothed in double-angle
 // orientation space so opposite edge-normals reinforce). A dome-shade map lifts the
-// floss into 3D; it sits on procedural woven fabric with a contact shadow, and a
-// cursor-following sheen turns the threads over in the light. Sewn in one satin
-// cross-row at a time (BFS layers over the stitch graph, needle following each stroke).
+// floss into 3D on a transparent ground, and a cursor-following sheen turns the threads
+// over in the light. The word is re-fitted to the container width on load/resize; it
+// can be sewn in one satin cross-row at a time (BFS layers over the stitch graph).
 //
-// This is the demo/index.html renderer with its module-level globals lifted into
-// per-instance closure state, exposed through createThreadText() -> ThreadTextInstance.
+// Exposed through createThreadText() -> ThreadTextInstance.
 
 import type { ThreadTextOptions, ThreadTextInstance } from './types'
 import { THREAD_TEXT_CLASSES } from './types'
@@ -108,6 +107,11 @@ export function parseColor(input: string, fallback: [number, number, number]): [
 /** Clamp a number to the 0–255 byte range and round. */
 function byte(n: number): number { return n < 0 ? 0 : n > 255 ? 255 : Math.round(n) }
 
+/** First font-family token, unquoted — for `document.fonts.load/check`. */
+function primaryOf(font: string): string {
+	return (font.split(',')[0] || 'serif').trim().replace(/^["']|["']$/g, '')
+}
+
 // A single laid stitch: position, thread angle, and pre-shaded sprite brightness bucket.
 interface Stitch { x: number; y: number; ang: number; idx: number }
 
@@ -123,33 +127,38 @@ interface Stitch { x: number; y: number; ang: number; idx: number }
 export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): ThreadTextInstance {
 	// SSR / no-DOM guard — return an inert handle.
 	if (typeof window === 'undefined' || typeof document === 'undefined' || !target) {
-		return { setText() {}, replay() {}, resize() {}, destroy() {}, get text() { return opts.text ?? '' } }
+		return { setText() {}, replay() {}, resize() {}, update() {}, focus() {}, destroy() {}, get text() { return opts.text ?? '' } }
 	}
 
-	// ── options / config ──
+	// ── mutable options / config ──
 	let text = opts.text ?? ''
-	const font = opts.font ?? 'Georgia, serif'
-	const weight = opts.weight ?? 680
-	const aspect = opts.aspect ?? 0.46
-	const sewRate = opts.sewRate ?? 110
-	const sheenOn = opts.sheen ?? true
-	const animate = opts.animate ?? true
-	const primaryFamily = (font.split(',')[0] || 'serif').trim().replace(/^["']|["']$/g, '')
+	let font = opts.font ?? 'Georgia, serif'
+	let weight = opts.weight ?? 680
+	let fill = opts.fill ?? 0.9
+	let sewRate = opts.sewRate ?? 110
+	let sheenOn = opts.sheen ?? true
+	let animate = opts.animate ?? true
+	let editable = opts.editable ?? false
+	let pitchOpt = opts.pitch
+	let onTextChange = opts.onTextChange
+	let primaryFamily = primaryOf(font)
 
 	const REDUCED = opts.reducedMotion ??
 		!!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
 
 	// Thread colour ramp (lit crest → mid → soft ends), derived from threadColor.
-	const threadPeak = parseColor(opts.threadColor ?? '#fffbf3', [255, 251, 243])
-	const threadMid: [number, number, number] = [threadPeak[0] * 0.585, threadPeak[1] * 0.585, threadPeak[2] * 0.585]
-	const threadEnd: [number, number, number] = [threadPeak[0] * 0.47, threadPeak[1] * 0.47, threadPeak[2] * 0.47]
-	// Fabric: outer base colour + a slightly-lighter inner (radial ground).
-	const fabricOuter = parseColor(opts.fabricColor ?? '#08080a', [8, 8, 10])
-	const fabricInner: [number, number, number] = [byte(fabricOuter[0] + 14), byte(fabricOuter[1] + 13), byte(fabricOuter[2] + 15)]
-	const rgb = (c: [number, number, number]) => `rgb(${byte(c[0])},${byte(c[1])},${byte(c[2])})`
+	let threadPeak = parseColor(opts.threadColor ?? '#fffbf3', [255, 251, 243])
+	let threadMid: [number, number, number] = [0, 0, 0]
+	let threadEnd: [number, number, number] = [0, 0, 0]
+	function setThreadRamp(color: string): void {
+		threadPeak = parseColor(color, [255, 251, 243])
+		threadMid = [threadPeak[0] * 0.585, threadPeak[1] * 0.585, threadPeak[2] * 0.585]
+		threadEnd = [threadPeak[0] * 0.47, threadPeak[1] * 0.47, threadPeak[2] * 0.47]
+	}
+	setThreadRamp(opts.threadColor ?? '#fffbf3')
 
 	// ── target canvases ──
-	const created: HTMLCanvasElement[] = []
+	const created: HTMLElement[] = []
 	let bgC: HTMLCanvasElement
 	let container: HTMLElement
 	if (target instanceof HTMLCanvasElement) {
@@ -169,16 +178,20 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	bgC.style.display = 'block'; bgC.style.width = '100%'
 	Object.assign(fxC.style, { position: 'absolute', inset: '0', width: '100%', pointerEvents: 'none', mixBlendMode: 'screen' } as CSSStyleDeclaration)
 
-	// ── per-instance render state (was module globals in the demo) ──
+	// Caret element (editable mode).
+	let caretEl: HTMLElement | null = null
+	let focused = false
+
+	// ── per-instance render state ──
 	let W = 0, H = 0
-	let FS = 0, ANCHOR_X = 0          // fixed font size + left anchor so appended letters don't reflow
+	let FS = 0, ANCHOR_X = 0
 	let PITCH = 4
 	let SPRITES: HTMLCanvasElement[] = [], SPRITE_W = 0, SPRITE_H = 0
 	let MASK: Uint8Array = new Uint8Array(0)
 	let SHADE: Float32Array = new Float32Array(0)
 	let EX: Float32Array = new Float32Array(0), EY: Float32Array = new Float32Array(0)
-	let MASKCV: HTMLCanvasElement | null = null, SHADOWCV: HTMLCanvasElement | null = null
-	let FABRIC_CV: HTMLCanvasElement | null = null, OFFCV: HTMLCanvasElement | null = null
+	let MASKCV: HTMLCanvasElement | null = null
+	let OFFCV: HTMLCanvasElement | null = null
 	let OFFCTX: CanvasRenderingContext2D | null = null
 	let STITCHES: Stitch[] = [], STEP_G = 3
 
@@ -189,16 +202,46 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let rafId = 0, loopStarted = false, lastTS = 0
 	let destroyed = false, booted = false
 
-	// ── sizing ──
-	function computeSize(): void {
+	// ── fit-to-width sizing: derive FS from the container width, height from the glyphs ──
+	function layout(): void {
 		const rect = container.getBoundingClientRect()
-		const cssW = Math.round(rect.width || Math.min(window.innerWidth * 0.95, 1240))
-		const cssH = Math.round(cssW * aspect)
+		const cssW = Math.max(1, Math.round(rect.width || Math.min(window.innerWidth * 0.95, 1240)))
+		const ref = text || 'Ag'
+		const mc = bgC.getContext('2d')
+
+		// Font size (CSS px) so the word spans fill × container width.
+		let refW100 = 100
+		if (mc) { mc.font = `${weight} 100px ${font}`; refW100 = mc.measureText(ref).width || 100 }
+		let fsCss = Math.max(8, (100 * (cssW * fill)) / refW100)
+
+		// Height (CSS px) from the glyph extent around the middle baseline, plus a little padding.
+		let asc = fsCss * 0.70, desc = fsCss * 0.30, refWfs = cssW * fill
+		if (mc) {
+			mc.font = `${weight} ${fsCss}px ${font}`
+			const m = mc.measureText(ref)
+			refWfs = m.width || refWfs
+			if (m.actualBoundingBoxAscent > 0) asc = m.actualBoundingBoxAscent
+			if (m.actualBoundingBoxDescent > 0) desc = m.actualBoundingBoxDescent
+		}
+		const cssH = Math.max(1, Math.round(2 * Math.max(asc, desc) * 1.12))
+
+		// DPR + area budget (keep the per-render cost bounded).
 		let scale = Math.min(window.devicePixelRatio || 1, 1.7)
-		while (cssW * scale * cssH * scale > 900000 && scale > 0.55) scale -= 0.1   // lower res → snappier per-keystroke rebuild
-		W = Math.max(1, Math.round(cssW * scale)); H = Math.max(1, Math.round(cssH * scale))
+		while (cssW * scale * cssH * scale > 900000 && scale > 0.4) scale -= 0.1
+		W = Math.max(1, Math.round(cssW * scale))
+		H = Math.max(1, Math.round(cssH * scale))
+		FS = Math.max(4, Math.round(fsCss * scale))
+		ANCHOR_X = Math.round(W / 2 - (refWfs * scale) / 2)
+
 		for (const c of [bgC, fxC]) { c.width = W; c.height = H; c.style.height = cssH + 'px' }
 		container.style.height = cssH + 'px'
+		PITCH = pitchOpt != null ? pitchOpt : Math.max(3.0, H * 0.0095)
+	}
+
+	// ── reused glyph-raster scratch (sized to the canvas) ──
+	function allocScratch(): void {
+		OFFCV = document.createElement('canvas'); OFFCV.width = W; OFFCV.height = H
+		OFFCTX = OFFCV.getContext('2d', { willReadFrequently: true })
 	}
 
 	// ── thread sprite (pre-shaded), in 20 brightness variants ──
@@ -300,39 +343,13 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		// solid white mask canvas (for cursor-sheen clipping)
 		MASKCV = document.createElement('canvas'); MASKCV.width = W; MASKCV.height = H
 		const mc = MASKCV.getContext('2d')
-		// dark shadow canvas (black with mask alpha — the contact shadow / seat)
-		SHADOWCV = document.createElement('canvas'); SHADOWCV.width = W; SHADOWCV.height = H
-		const sc = SHADOWCV.getContext('2d')
-		if (mc && sc) {
-			const md = mc.createImageData(W, H), sdd = sc.createImageData(W, H)
+		if (mc) {
+			const md = mc.createImageData(W, H)
 			for (let i = 0; i < W * H; i++) if (mask[i]) {
 				md.data[i * 4] = 255; md.data[i * 4 + 1] = 255; md.data[i * 4 + 2] = 255; md.data[i * 4 + 3] = 255
-				sdd.data[i * 4 + 3] = 255   // black, opaque
 			}
 			mc.putImageData(md, 0, 0)
-			sc.putImageData(sdd, 0, 0)
 		}
-	}
-
-	// ── size-dependent scratch: bake the static woven linen once + reused glyph scratch ──
-	function allocForSize(): void {
-		FABRIC_CV = document.createElement('canvas'); FABRIC_CV.width = W; FABRIC_CV.height = H
-		const c = FABRIC_CV.getContext('2d', { willReadFrequently: true })
-		if (c) {
-			const g = c.createRadialGradient(W * 0.5, H * 0.4, 0, W * 0.5, H * 0.5, W * 0.72)
-			g.addColorStop(0, rgb(fabricInner)); g.addColorStop(1, rgb(fabricOuter))
-			c.fillStyle = g; c.fillRect(0, 0, W, H)
-			const img = c.getImageData(0, 0, W, H), d = img.data
-			for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-				const i = (y * W + x) * 4
-				const warp = Math.sin(x * 1.9) * 0.5 + 0.5, weft = Math.sin(y * 1.9) * 0.5 + 0.5
-				const v = (warp * weft) * 9 - 4.5 + (vnoise(x * 0.18, y * 0.18) - 0.5) * 15
-				d[i] = byte(d[i] + v); d[i + 1] = byte(d[i + 1] + v); d[i + 2] = byte(d[i + 2] + v * 1.1)
-			}
-			c.putImageData(img, 0, 0)
-		}
-		OFFCV = document.createElement('canvas'); OFFCV.width = W; OFFCV.height = H
-		OFFCTX = OFFCV.getContext('2d', { willReadFrequently: true })
 	}
 
 	// ── stitch list (sorted by x only for leftX/rightX bounds; reveal order is the BFS) ──
@@ -360,13 +377,10 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	function drawAll(): void { const c = bgC.getContext('2d'); if (!c) return; for (const s of STITCHES) drawStitch(c, s) }
 	function rightX(): number { return STITCHES.length ? STITCHES[STITCHES.length - 1].x : 0 }
 	function leftX(): number { return STITCHES.length ? STITCHES[0].x : 0 }
+	/** Clear the base canvas to transparent (no fabric, no contact shadow). */
 	function resetBg(): void {
-		const c = bgC.getContext('2d'); if (!c || !FABRIC_CV) return
-		c.drawImage(FABRIC_CV, 0, 0)                                   // cached static linen
-		if (SHADOWCV) {
-			c.save(); c.globalAlpha = 0.85; c.filter = `blur(${Math.round(H * 0.018)}px)`
-			c.drawImage(SHADOWCV, 0, Math.round(H * 0.02)); c.restore()   // per-word contact shadow
-		}
+		const c = bgC.getContext('2d'); if (!c) return
+		c.clearRect(0, 0, W, H)
 	}
 
 	// ── satin sewing animation: one BFS cross-row at a time, needle following the stroke ──
@@ -398,15 +412,12 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		}
 		return rows
 	}
-	function startReveal(fromX: number, rate?: number): void {
+	function startReveal(): void {
 		resetBg()
-		const c = bgC.getContext('2d'); if (!c) return
-		const subset: Stitch[] = []
-		for (const s of STITCHES) { if (s.x <= fromX) drawStitch(c, s); else subset.push(s) }   // existing letters appear at once
-		if (REDUCED) { for (const s of subset) drawStitch(c, s); anim.on = false; return }        // no motion: draw instantly
-		anim.rows = buildSewRows(subset)
+		if (REDUCED || !animate) { drawAll(); anim.on = false; return }
+		anim.rows = buildSewRows(STITCHES)
 		anim.idx = 0; anim.acc = 0
-		anim.rate = rate || sewRate                       // satin cross-rows laid per second
+		anim.rate = sewRate
 		anim.on = anim.rows.length > 0
 	}
 	function drawRowsTo(n: number): void {
@@ -426,13 +437,27 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		c.globalCompositeOperation = 'destination-in'; c.drawImage(MASKCV, 0, 0); c.globalCompositeOperation = 'source-over'
 	}
 
-	// ── fixed font size + left anchor (computed once per size) so letters don't reflow ──
-	function calibrate(): void {
-		const c = bgC.getContext('2d'); if (!c) { FS = Math.round(H * 0.6); ANCHOR_X = Math.round(W * 0.14); return }
-		const ref = text || 'Ag'
-		c.font = `${weight} 100px ${font}`; const w = c.measureText(ref).width || 100
-		FS = Math.round(100 * (W * 0.72) / w)
-		c.font = `${weight} ${FS}px ${font}`; ANCHOR_X = Math.round(W / 2 - c.measureText(ref).width / 2)
+	// ── caret (editable mode) ──
+	function ensureCaret(): void {
+		if (caretEl || !editable) return
+		caretEl = document.createElement('span')
+		caretEl.className = THREAD_TEXT_CLASSES.caret
+		caretEl.setAttribute('aria-hidden', 'true')
+		Object.assign(caretEl.style, { position: 'absolute', pointerEvents: 'none', borderRadius: '1px', opacity: '0', background: `rgb(${byte(threadPeak[0])},${byte(threadPeak[1])},${byte(threadPeak[2])})` } as CSSStyleDeclaration)
+		container.appendChild(caretEl); created.push(caretEl)
+	}
+	function updateCaret(): void {
+		if (!editable || !caretEl) return
+		const c = bgC.getContext('2d'); if (!c) return
+		c.font = `${weight} ${FS}px ${font}`
+		const wWidth = c.measureText(text).width
+		const scale = (bgC.clientWidth || W) / W
+		const capH = FS * 0.7
+		caretEl.style.left = ((ANCHOR_X + wWidth + FS * 0.05) * scale) + 'px'
+		caretEl.style.top = (0.5 * (bgC.clientHeight || H) - (capH * scale) / 2) + 'px'
+		caretEl.style.height = (capH * scale) + 'px'
+		caretEl.style.width = Math.max(2, Math.round(FS * 0.02 * scale)) + 'px'
+		caretEl.style.background = `rgb(${byte(threadPeak[0])},${byte(threadPeak[1])},${byte(threadPeak[2])})`
 	}
 
 	// ── the rAF loop ──
@@ -442,6 +467,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		const dt = Math.min(0.25, (ts - lastTS) / 1000); lastTS = ts   // catch-up on throttled frames → wall-clock-paced reveal
 		if (anim.on) { anim.acc += anim.rate * dt; drawRowsTo(anim.acc); if (anim.idx >= anim.rows.length) anim.on = false }
 		if (sheenDirty && MASKCV) { drawSheen(sheen.set ? sheen.x : W * 0.5, sheen.set ? sheen.y : H * 0.34); sheenDirty = false }
+		if (caretEl) caretEl.style.opacity = (editable && focused && (Math.floor(ts / 530) % 2 === 0)) ? '1' : '0'
 		rafId = requestAnimationFrame(loop)
 	}
 
@@ -452,40 +478,89 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		sheen.y = ((e.clientY - r.top) / (r.height || 1)) * H
 		sheen.set = true; sheenDirty = true
 	}
-	if (sheenOn) window.addEventListener('pointermove', onPointerMove, { passive: true })
 
-	// ── rebuild helpers used by the public API ──
-	function paint(withAnimation: boolean): void {
-		build(); buildStitchList()
-		if (withAnimation && animate && !REDUCED) startReveal(leftX() - 1, sewRate)
+	// ── input: typing (editable mode) ──
+	function onKeyDown(e: KeyboardEvent): void {
+		if (!editable || e.metaKey || e.ctrlKey || e.altKey) return
+		if (e.key === 'Backspace') { e.preventDefault(); commitText(text.slice(0, -1), true); return }
+		if (e.key === 'Enter') { e.preventDefault(); api.replay(); return }
+		if ([...e.key].length === 1) { e.preventDefault(); commitText(text + e.key, true) }
+	}
+	function onFocus(): void { focused = true }
+	function onBlur(): void { focused = false; if (caretEl) caretEl.style.opacity = '0' }
+	function onPointerDown(): void { if (editable) container.focus() }
+
+	function applyEditable(on: boolean): void {
+		editable = on
+		if (on) {
+			container.tabIndex = 0
+			container.setAttribute('role', 'textbox')
+			if (!container.getAttribute('aria-label')) container.setAttribute('aria-label', 'Editable embroidered text — type to change it')
+			ensureCaret()
+			container.addEventListener('keydown', onKeyDown)
+			container.addEventListener('focus', onFocus)
+			container.addEventListener('blur', onBlur)
+			container.addEventListener('pointerdown', onPointerDown)
+			updateCaret()
+		} else {
+			container.removeAttribute('tabindex')
+			container.removeAttribute('role')
+			container.removeEventListener('keydown', onKeyDown)
+			container.removeEventListener('focus', onFocus)
+			container.removeEventListener('blur', onBlur)
+			container.removeEventListener('pointerdown', onPointerDown)
+			if (caretEl) caretEl.style.opacity = '0'
+		}
+	}
+
+	function applySheen(on: boolean): void {
+		if (on === sheenOn) return
+		sheenOn = on
+		if (on) { window.addEventListener('pointermove', onPointerMove, { passive: true }); sheenDirty = true }
+		else { window.removeEventListener('pointermove', onPointerMove); const c = fxC.getContext('2d'); if (c) c.clearRect(0, 0, W, H) }
+	}
+
+	// ── full render: fit to width, rebuild geometry, then sew or draw instantly ──
+	function render(sew: boolean): void {
+		layout(); allocScratch(); buildSprites(); build(); buildStitchList()
+		if (sew) startReveal()
 		else { resetBg(); drawAll(); anim.on = false }
-		sheenDirty = true
-	}
-	function firstPaint(): void {
-		if (destroyed) return
-		computeSize(); allocForSize()
-		PITCH = Math.max(3.4, H * 0.0095)
-		buildSprites(); calibrate()
-		paint(true)
-		booted = true
-		if (!loopStarted) { loopStarted = true; rafId = requestAnimationFrame(loop) }
+		updateCaret(); sheenDirty = true
 	}
 
-	// Wait for the requested face if it is not already available, then paint once.
+	/** Set text and redraw instantly (no sew-in). `notify` fires onTextChange (internal edits only). */
+	function commitText(next: string, notify: boolean): void {
+		next = next ?? ''
+		if (next === text && booted) return
+		text = next
+		if (!booted) return
+		render(false)
+		if (notify && onTextChange) onTextChange(text)
+	}
+
+	// Wait for a face to be available (bounded), then run cb. Immediate if already loaded / no API.
 	let fontTimer: ReturnType<typeof setTimeout> | undefined
-	function whenFontReady(cb: () => void): void {
-		const spec = `${weight} 200px ${primaryFamily}`
+	function whenFontReady(fam: string, wght: number, cb: () => void): void {
+		const spec = `${wght} 200px ${fam}`
 		let already = false
 		try { already = !!document.fonts && document.fonts.check(spec) } catch { already = true }
 		if (!document.fonts || already) { cb(); return }
 		let done = false
 		const go = () => { if (!done) { done = true; if (fontTimer) clearTimeout(fontTimer); cb() } }
 		document.fonts.load(spec, text).then(() => document.fonts.ready).then(go, go)
-		fontTimer = setTimeout(go, 1500)   // never wait forever on a font that won't load
+		fontTimer = setTimeout(go, 1500)
 	}
 
 	// ── boot ──
-	whenFontReady(firstPaint)
+	function firstPaint(): void {
+		if (destroyed) return
+		render(true)   // sew-in on mount (when animate)
+		booted = true
+		if (!loopStarted) { loopStarted = true; rafId = requestAnimationFrame(loop) }
+	}
+	if (editable) applyEditable(true)
+	if (sheenOn) window.addEventListener('pointermove', onPointerMove, { passive: true })
+	whenFontReady(primaryFamily, weight, firstPaint)
 
 	// Debounced self-resize so the standalone (non-React) API stays responsive.
 	let resizeTimer: ReturnType<typeof setTimeout> | undefined
@@ -496,31 +571,37 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	const api: ThreadTextInstance = {
 		get text() { return text },
 		setText(next: string): void {
-			if (destroyed || !booted) { text = next ?? ''; return }
-			next = next ?? ''
-			const isAppend = next.length > text.length && text.length > 0 && next.startsWith(text)
-			const prev = isAppend ? rightX() : -1
-			text = next
-			build(); buildStitchList()
-			if (REDUCED || !animate) { resetBg(); drawAll(); anim.on = false }
-			else startReveal(isAppend && prev > 0 ? Math.min(prev, rightX()) : leftX() - 1, isAppend ? 320 : sewRate)
-			sheenDirty = true
+			if (destroyed) return
+			if (!booted) { text = next ?? ''; return }
+			commitText(next, false)
 		},
 		replay(): void {
 			if (destroyed || !booted) return
-			if (REDUCED || !animate) { resetBg(); drawAll(); anim.on = false }
-			else startReveal(leftX() - 1, sewRate)
-			sheenDirty = true
+			render(true)
 		},
 		resize(): void {
+			if (destroyed || !booted) return
+			render(false)
+		},
+		update(partial: Partial<ThreadTextOptions>): void {
 			if (destroyed) return
-			computeSize(); allocForSize()
-			PITCH = Math.max(3.4, H * 0.0095)
-			buildSprites(); calibrate()
-			build(); buildStitchList()
-			resetBg(); drawAll(); anim.on = false   // re-fit instantly (no re-sew)
+			let geom = false, spritesOnly = false
+			if (partial.font !== undefined && partial.font !== font) { font = partial.font; primaryFamily = primaryOf(font); geom = true }
+			if (partial.weight !== undefined && partial.weight !== weight) { weight = partial.weight; geom = true }
+			if (partial.fill !== undefined && partial.fill !== fill) { fill = partial.fill; geom = true }
+			if (partial.pitch !== undefined && partial.pitch !== pitchOpt) { pitchOpt = partial.pitch; geom = true }
+			if (partial.threadColor !== undefined) { setThreadRamp(partial.threadColor); spritesOnly = true }
+			if (partial.sewRate !== undefined) sewRate = partial.sewRate
+			if (partial.animate !== undefined) animate = partial.animate
+			if (partial.onTextChange !== undefined) onTextChange = partial.onTextChange
+			if (partial.sheen !== undefined) applySheen(partial.sheen)
+			if (partial.editable !== undefined && partial.editable !== editable) applyEditable(partial.editable)
+			if (!booted) return
+			if (geom) whenFontReady(primaryFamily, weight, () => { if (!destroyed) render(false) })
+			else if (spritesOnly) { buildSprites(); resetBg(); drawAll(); updateCaret() }
 			sheenDirty = true
 		},
+		focus(): void { if (!destroyed && editable) container.focus() },
 		destroy(): void {
 			if (destroyed) return
 			destroyed = true
@@ -528,13 +609,13 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			clearTimeout(resizeTimer)
 			if (fontTimer) clearTimeout(fontTimer)
 			window.removeEventListener('resize', onResize)
-			if (sheenOn) window.removeEventListener('pointermove', onPointerMove)
+			window.removeEventListener('pointermove', onPointerMove)
+			if (editable) applyEditable(false)
 			for (const c of created) c.remove()
-			// drop large buffers so the instance can be GC'd promptly
 			SPRITES = []; STITCHES = []; anim.rows = []
 			MASK = new Uint8Array(0); SHADE = new Float32Array(0)
 			EX = new Float32Array(0); EY = new Float32Array(0)
-			MASKCV = SHADOWCV = FABRIC_CV = OFFCV = null; OFFCTX = null
+			MASKCV = OFFCV = null; OFFCTX = null; caretEl = null
 		},
 	}
 	return api

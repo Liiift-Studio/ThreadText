@@ -108,12 +108,44 @@ describe('createThreadText', () => {
 		expect(inst.text).toBe('Hi')
 	})
 
-	it('setText updates the current text (append animates the delta)', () => {
+	it('setText updates the current text and refits (no sew-in)', () => {
 		inst = createThreadText(host, { text: 'Th' })
 		inst.setText('Thr')
 		expect(inst.text).toBe('Thr')
-		inst.setText('World') // non-append → full re-sew, must not throw
+		inst.setText('World')
 		expect(inst.text).toBe('World')
+	})
+
+	it('update() changes options live without remounting (no re-sew)', () => {
+		inst = createThreadText(host, { text: 'Hue' })
+		const before = host.querySelectorAll('canvas')
+		expect(() => inst!.update({ threadColor: '#ff0000' })).not.toThrow()
+		expect(() => inst!.update({ weight: 400, fill: 0.7, sewRate: 200, animate: false, sheen: false })).not.toThrow()
+		const after = host.querySelectorAll('canvas')
+		// Same canvases — update() does not tear down and recreate.
+		expect(after.length).toBe(2)
+		expect(after[0]).toBe(before[0])
+	})
+
+	it('editable makes the surface focusable and typeable', () => {
+		inst = createThreadText(host, { text: 'Type' })
+		inst.update({ editable: true })
+		expect(host.getAttribute('role')).toBe('textbox')
+		expect(host.getAttribute('tabindex')).toBe('0')
+		expect(host.querySelector('.' + THREAD_TEXT_CLASSES.caret)).toBeTruthy()
+		expect(() => inst!.focus()).not.toThrow()
+		inst.update({ editable: false })
+		expect(host.getAttribute('role')).toBeNull()
+	})
+
+	it('editable + onTextChange fires on typed edits', () => {
+		let latest = ''
+		inst = createThreadText(host, { text: 'Go', editable: true, onTextChange: (t) => { latest = t } })
+		host.dispatchEvent(Object.assign(new Event('keydown'), { key: 'x', preventDefault() {} }))
+		expect(inst.text).toBe('Gox')
+		expect(latest).toBe('Gox')
+		host.dispatchEvent(Object.assign(new Event('keydown'), { key: 'Backspace', preventDefault() {} }))
+		expect(inst.text).toBe('Go')
 	})
 
 	it('replay and resize do not throw', () => {

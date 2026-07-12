@@ -1,13 +1,18 @@
 "use client"
 
-// Interactive threadText demo — type a word and watch it sew itself in as satin-stitch
-// embroidery, with live thread/fabric colour, weight, sew-rate, and sheen controls.
+// Interactive threadText demo — type a word (in the input or straight on the artwork) and
+// watch it embroider itself. Font, size, weight, sew-rate, sheen, and thread colour are all
+// live: they redraw instantly via update() without re-running the sew-in animation.
 import { useEffect, useRef, useState, useCallback } from "react"
 import { createThreadText } from "@liiift-studio/threadtext"
 import type { ThreadTextInstance } from "@liiift-studio/threadtext"
 
-/** Demo/hero face — the OFL Fraunces variable font (declared in globals.css). */
-const FONT = '"Fraunces", Georgia, serif'
+/** Curated set of loaded / system faces that embroider well. */
+const FONTS = [
+	{ label: "Fraunces", value: '"Fraunces", Georgia, serif' },
+	{ label: "Merriweather", value: 'Merriweather, Georgia, serif' },
+	{ label: "Georgia", value: "Georgia, serif" },
+]
 
 /** Labelled range slider with the value announced to screen readers. */
 function Slider({ label, value, min, max, step, fmt, onChange, title }: { label: string; value: number; min: number; max: number; step: number; fmt?: (v: number) => string; onChange: (v: number) => void; title?: string }) {
@@ -21,16 +26,15 @@ function Slider({ label, value, min, max, step, fmt, onChange, title }: { label:
 	)
 }
 
-/** Small labelled colour swatch input. */
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+/** Pill toggle button. */
+function Toggle({ label, on, onClick, title }: { label: string; on: boolean; onClick: () => void; title?: string }) {
 	return (
-		<label className="flex flex-col gap-1">
+		<div className="flex flex-col gap-1">
 			<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">{label}</span>
-			<span className="flex items-center gap-2">
-				<input type="color" value={value} aria-label={label} onChange={e => onChange(e.target.value)} style={{ width: 34, height: 26, border: '1px solid currentColor', borderRadius: 6, background: 'transparent', cursor: 'pointer', padding: 0 }} />
-				<span className="tabular-nums text-xs text-muted">{value}</span>
-			</span>
-		</label>
+			<button onClick={onClick} aria-pressed={on} title={title} className="text-xs px-3 py-2 rounded-full border transition-opacity self-start" style={{ borderColor: 'currentColor', opacity: on ? 1 : 0.5, background: on ? 'var(--btn-bg)' : 'transparent' }}>
+				{on ? 'On' : 'Off'}
+			</button>
+		</div>
 	)
 }
 
@@ -39,34 +43,51 @@ export default function Demo() {
 	const instRef = useRef<ThreadTextInstance | null>(null)
 
 	const [text, setText] = useState("Thread")
+	const [font, setFont] = useState(FONTS[0].value)
 	const [weight, setWeight] = useState(680)
+	const [fill, setFill] = useState(0.9)
 	const [sewRate, setSewRate] = useState(140)
 	const [threadColor, setThreadColor] = useState("#fdf3df")
-	const [fabricColor, setFabricColor] = useState("#0b0b12")
 	const [sheen, setSheen] = useState(true)
+	const [animate, setAnimate] = useState(true)
 
-	// Structural options — a change here re-embroiders from scratch. Text is handled separately
-	// (via setText) so typing animates only the newly-added letters.
-	const structuralKey = `${weight}|${sewRate}|${threadColor}|${fabricColor}|${sheen}`
+	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, sheen, animate })
 
+	// Create once; everything below is applied live.
 	useEffect(() => {
 		const el = hostRef.current
 		if (!el) return
-		const inst = createThreadText(el, { text, font: FONT, weight, sewRate, threadColor, fabricColor, sheen })
+		const inst = createThreadText(el, {
+			...initial.current,
+			editable: true,                       // type straight on the artwork
+			onTextChange: (t) => setText(t),      // keep the input in sync when typing on the canvas
+		})
 		instRef.current = inst
-		return () => { inst.destroy(); instRef.current = null }
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [structuralKey])
 
-	// Text-only changes route through setText — appends sew in, replacements re-sew the word.
+		let raf = 0
+		const ro = typeof ResizeObserver !== 'undefined'
+			? new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => instRef.current?.resize()) })
+			: undefined
+		ro?.observe(el)
+
+		return () => { ro?.disconnect(); cancelAnimationFrame(raf); inst.destroy(); instRef.current = null }
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [])
+
+	// Live parameter changes — instant redraw, no re-sew.
+	useEffect(() => {
+		instRef.current?.update({ font, weight, fill, sewRate, threadColor, sheen, animate })
+	}, [font, weight, fill, sewRate, threadColor, sheen, animate])
+
+	// Text changes (input or canvas typing).
 	useEffect(() => { instRef.current?.setText(text) }, [text])
 
 	const replay = useCallback(() => instRef.current?.replay(), [])
 
 	return (
 		<div className="w-full flex flex-col gap-6">
-			{/* Embroidery surface */}
-			<div ref={hostRef} style={{ width: '100%' }} role="img" aria-label={`The word "${text}" rendered as satin-stitch embroidery`} />
+			{/* Embroidery surface — click and type directly, or use the input below */}
+			<div ref={hostRef} style={{ width: '100%', cursor: 'text' }} aria-label={`The word "${text}" as satin-stitch embroidery — click and type to change it`} />
 
 			{/* Word input + replay */}
 			<div className="flex flex-wrap items-end gap-4">
@@ -79,8 +100,14 @@ export default function Demo() {
 						aria-label="Word to embroider"
 						onChange={e => setText(e.target.value)}
 						className="bg-transparent border rounded-lg px-3 py-2 text-base"
-						style={{ borderColor: 'currentColor', fontFamily: FONT }}
+						style={{ borderColor: 'currentColor', fontFamily: font }}
 					/>
+				</label>
+				<label className="flex flex-col gap-1">
+					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Font</span>
+					<select value={font} aria-label="Font" onChange={e => setFont(e.target.value)} className="bg-transparent border rounded-lg px-3 py-2 text-base" style={{ borderColor: 'currentColor' }}>
+						{FONTS.map(f => <option key={f.label} value={f.value} style={{ color: '#111' }}>{f.label}</option>)}
+					</select>
 				</label>
 				<button
 					onClick={replay}
@@ -94,27 +121,23 @@ export default function Demo() {
 
 			{/* Controls */}
 			<div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+				<Slider label="Size" value={fill} min={0.4} max={1} step={0.02} fmt={v => `${Math.round(v * 100)}%`} onChange={setFill} title="Fraction of the width the word fills — refits to the container on resize" />
 				<Slider label="Weight" value={weight} min={200} max={900} step={10} onChange={setWeight} title="Numeric font weight — heavier strokes give broader satin bands" />
 				<Slider label="Sew rate" value={sewRate} min={30} max={320} step={10} fmt={v => `${v}/s`} onChange={setSewRate} title="Satin cross-rows laid per second during the sew-in" />
-				<div className="flex flex-col gap-1">
-					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Sheen</span>
-					<button
-						onClick={() => setSheen(v => !v)}
-						aria-pressed={sheen}
-						title="Cursor-following highlight that turns the threads over in the light"
-						className="text-xs px-3 py-2 rounded-full border transition-opacity self-start"
-						style={{ borderColor: 'currentColor', opacity: sheen ? 1 : 0.5, background: sheen ? 'var(--btn-bg)' : 'transparent' }}
-					>
-						{sheen ? 'On' : 'Off'}
-					</button>
-				</div>
-				<ColorField label="Thread" value={threadColor} onChange={setThreadColor} />
-				<ColorField label="Fabric" value={fabricColor} onChange={setFabricColor} />
+				<Toggle label="Sew-in" on={animate} onClick={() => setAnimate(v => !v)} title="Whether the word animates in one stitch at a time (Replay to see it)" />
+				<Toggle label="Sheen" on={sheen} onClick={() => setSheen(v => !v)} title="Cursor-following highlight that turns the threads over in the light" />
+				<label className="flex flex-col gap-1">
+					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Thread</span>
+					<span className="flex items-center gap-2">
+						<input type="color" value={threadColor} aria-label="Thread colour" onChange={e => setThreadColor(e.target.value)} style={{ width: 34, height: 26, border: '1px solid currentColor', borderRadius: 6, background: 'transparent', cursor: 'pointer', padding: 0 }} />
+						<span className="tabular-nums text-xs text-muted">{threadColor}</span>
+					</span>
+				</label>
 			</div>
 
 			<p className="text-xs text-muted italic" style={{ lineHeight: 1.8 }}>
-				Type to re-embroider — new letters sew in one satin cross-row at a time; move the cursor for the sheen.
-				Every stitch is placed procedurally from Fraunces&rsquo; glyph geometry — no pre-baked assets, no AI.
+				Click the artwork and type — the word re-fits to the width as you go, and colour, font, and size
+				change live without re-stitching. Toggle <em>Sew-in</em> and hit <em>Replay</em> to watch it embroider one satin row at a time.
 			</p>
 		</div>
 	)
