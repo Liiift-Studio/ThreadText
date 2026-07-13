@@ -11,10 +11,10 @@ function makeCtxStub() {
 	const gradient = { addColorStop() {} }
 	return {
 		canvas: null as unknown,
-		fillStyle: '', strokeStyle: '', font: '', textAlign: '', textBaseline: '',
+		fillStyle: '', strokeStyle: '', lineWidth: 1, lineCap: '', font: '', textAlign: '', textBaseline: '',
 		globalCompositeOperation: '', globalAlpha: 1, filter: '',
 		clearRect() {}, fillRect() {}, fillText() {},
-		beginPath() {}, moveTo() {}, lineTo() {}, arc() {}, closePath() {}, fill() {},
+		beginPath() {}, moveTo() {}, lineTo() {}, arc() {}, ellipse() {}, closePath() {}, fill() {}, stroke() {},
 		save() {}, restore() {}, translate() {}, rotate() {}, drawImage() {},
 		createLinearGradient() { return gradient }, createRadialGradient() { return gradient },
 		measureText(s: string) { return { width: (s ? s.length : 1) * 10 } },
@@ -169,6 +169,17 @@ describe('createThreadText', () => {
 		expect(() => inst!.replay()).not.toThrow()
 		expect(() => inst!.update({ sewStyle: 'machine' })).not.toThrow()
 		expect(() => inst!.replay()).not.toThrow()
+	})
+
+	it('all stitch modes build without throwing', () => {
+		for (const mode of ['satin', 'cross', 'chain', 'running'] as const) {
+			const i = createThreadText(host, { text: 'Mode', stitchMode: mode })
+			expect(host.querySelectorAll('canvas').length).toBeGreaterThanOrEqual(2)
+			i.destroy()
+		}
+		inst = createThreadText(host, { text: 'X', stitchMode: 'satin' })
+		expect(() => inst!.update({ stitchMode: 'cross' })).not.toThrow()
+		expect(() => inst!.update({ stitchMode: 'chain' })).not.toThrow()
 	})
 
 	it('reduced-motion draws instantly and still renders', () => {

@@ -139,6 +139,9 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let fill = clamp(opts.fill ?? 0.9, 0.05, 1)
 	let sewRate = Math.max(1, opts.sewRate ?? 110)
 	let sewStyle: 'machine' | 'hand' = opts.sewStyle === 'hand' ? 'hand' : 'machine'
+	const STITCH_MODES = ['satin', 'cross', 'chain', 'running'] as const
+	type StitchMode = typeof STITCH_MODES[number]
+	let stitchMode: StitchMode = (STITCH_MODES as readonly string[]).includes(opts.stitchMode ?? '') ? (opts.stitchMode as StitchMode) : 'satin'
 	let sheenOn = opts.sheen ?? true
 	let animate = opts.animate ?? true
 	let editable = opts.editable ?? false
@@ -193,6 +196,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let FS = 0, ANCHOR_X = 0
 	let PITCH = 4
 	let SPRITES: HTMLCanvasElement[] = [], SPRITE_W = 0, SPRITE_H = 0
+	let spriteAngOffset = 0                       // extra rotation per stitch mode (along vs across stroke)
 	let spritePitch = -1, spriteColorKey = ''   // cache keys so sprites rebuild only when needed
 	let allocW = -1, allocH = -1                // OFFCV realloc only when size changes
 	let MASK: Uint8Array = new Uint8Array(0)
@@ -255,11 +259,17 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		allocW = W; allocH = H
 	}
 
-	// ── thread sprite (pre-shaded), in 20 brightness variants ──
+	/** Cache key: sprites depend on pitch, thread colour, and stitch mode. */
+	function spriteKey(): string { return threadPeak.join(',') + '|' + stitchMode }
+	// ── thread sprite (pre-shaded), in 20 brightness variants, per stitch mode ──
 	function buildSprites(): void {
-		const L = Math.max(7, PITCH * 2.5)     // thread length (across the stroke)
+		const L = Math.max(7, PITCH * 2.5)     // thread length
 		const Wd = Math.max(3.2, PITCH * 1.3)  // thread width
-		SPRITE_W = Math.ceil(L) + 2; SPRITE_H = Math.ceil(Wd) + 2
+		// square sprite for X / loop textures; long-thin for satin / running
+		if (stitchMode === 'cross' || stitchMode === 'chain') { SPRITE_W = SPRITE_H = Math.ceil(L) + 2 }
+		else { SPRITE_W = Math.ceil(L) + 2; SPRITE_H = Math.ceil(Wd) + 2 }
+		// chain / running run ALONG the stroke; satin / cross across it
+		spriteAngOffset = (stitchMode === 'chain' || stitchMode === 'running') ? Math.PI / 2 : 0
 		SPRITES = []
 		for (let k = 0; k < 20; k++) {
 			const b = 0.34 + (k / 19) * 0.82           // brightness level (20 buckets → less banding)
@@ -267,38 +277,57 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			const c = cv.getContext('2d')
 			if (!c) { SPRITES.push(cv); continue }
 			const cx = SPRITE_W / 2, cy = SPRITE_H / 2
-			// rounded-tube cross-section (vertical gradient across the width)
-			const g = c.createLinearGradient(0, cy - Wd / 2, 0, cy + Wd / 2)
 			const col = (base: [number, number, number], a: number) => `rgba(${byte(base[0] * b)},${byte(base[1] * b)},${byte(base[2] * b)},${a})`
-			g.addColorStop(0.00, col(threadEnd, 0))
-			g.addColorStop(0.16, col(threadMid, 1))
-			g.addColorStop(0.50, col(threadPeak, 1))
-			g.addColorStop(0.84, col(threadMid, 1))
-			g.addColorStop(1.00, col(threadEnd, 0))
-			c.fillStyle = g
-			// stadium body
-			c.beginPath()
-			const r = Wd / 2
-			c.moveTo(cx - L / 2 + r, cy - r)
-			c.lineTo(cx + L / 2 - r, cy - r)
-			c.arc(cx + L / 2 - r, cy, r, -Math.PI / 2, Math.PI / 2)
-			c.lineTo(cx - L / 2 + r, cy + r)
-			c.arc(cx - L / 2 + r, cy, r, Math.PI / 2, -Math.PI / 2)
-			c.closePath()
-			c.fill()
-			// soft fade at the two ends so neighbours blend along the thread
-			c.globalCompositeOperation = 'destination-in'
-			const ge = c.createLinearGradient(cx - L / 2, 0, cx + L / 2, 0)
-			ge.addColorStop(0, 'rgba(0,0,0,0)'); ge.addColorStop(0.22, 'rgba(0,0,0,1)')
-			ge.addColorStop(0.78, 'rgba(0,0,0,1)'); ge.addColorStop(1, 'rgba(0,0,0,0)')
-			c.fillStyle = ge; c.fillRect(0, 0, SPRITE_W, SPRITE_H)
+			// A shaded rounded floss "tube" of `len`×`wid`, rotated `ang`, centred in the sprite.
+			const tube = (len: number, wid: number, ang: number, endFade: boolean) => {
+				c.save(); c.translate(cx, cy); c.rotate(ang)
+				const g = c.createLinearGradient(0, -wid / 2, 0, wid / 2)
+				g.addColorStop(0.00, col(threadEnd, 0))
+				g.addColorStop(0.16, col(threadMid, 1))
+				g.addColorStop(0.50, col(threadPeak, 1))
+				g.addColorStop(0.84, col(threadMid, 1))
+				g.addColorStop(1.00, col(threadEnd, 0))
+				c.fillStyle = g
+				const r = wid / 2
+				c.beginPath()
+				c.moveTo(-len / 2 + r, -r)
+				c.lineTo(len / 2 - r, -r)
+				c.arc(len / 2 - r, 0, r, -Math.PI / 2, Math.PI / 2)
+				c.lineTo(-len / 2 + r, r)
+				c.arc(-len / 2 + r, 0, r, Math.PI / 2, -Math.PI / 2)
+				c.closePath(); c.fill()
+				if (endFade) {   // soft ends so neighbouring satin threads blend along their length
+					c.globalCompositeOperation = 'destination-in'
+					const ge = c.createLinearGradient(-len / 2, 0, len / 2, 0)
+					ge.addColorStop(0, 'rgba(0,0,0,0)'); ge.addColorStop(0.22, 'rgba(0,0,0,1)')
+					ge.addColorStop(0.78, 'rgba(0,0,0,1)'); ge.addColorStop(1, 'rgba(0,0,0,0)')
+					c.fillStyle = ge; c.fillRect(-len / 2 - 1, -wid / 2 - 1, len + 2, wid + 2)
+					c.globalCompositeOperation = 'source-over'
+				}
+				c.restore()
+			}
+			if (stitchMode === 'cross') {
+				tube(L * 0.92, Wd * 0.82, Math.PI / 4, false)     // an X
+				tube(L * 0.92, Wd * 0.82, -Math.PI / 4, false)
+			} else if (stitchMode === 'chain') {
+				c.save(); c.translate(cx, cy)                     // a looped link
+				const g = c.createLinearGradient(0, -Wd, 0, Wd)
+				g.addColorStop(0, col(threadMid, 1)); g.addColorStop(0.5, col(threadPeak, 1)); g.addColorStop(1, col(threadMid, 1))
+				c.strokeStyle = g; c.lineWidth = Math.max(1.6, Wd * 0.7); c.lineCap = 'round'
+				c.beginPath(); c.ellipse(0, 0, L * 0.34, Wd * 1.05, 0, 0, Math.PI * 2); c.stroke()
+				c.restore()
+			} else if (stitchMode === 'running') {
+				tube(L * 0.5, Wd, 0, false)                       // a short dash
+			} else {
+				tube(L, Wd, 0, true)                              // satin (default)
+			}
 			SPRITES.push(cv)
 		}
-		spritePitch = PITCH; spriteColorKey = threadPeak.join(',')
+		spritePitch = PITCH; spriteColorKey = spriteKey()
 	}
-	/** Rebuild the sprite sheet only if the thread pitch or colour changed. */
+	/** Rebuild the sprite sheet only if the pitch, thread colour, or stitch mode changed. */
 	function ensureSprites(): void {
-		if (SPRITES.length && spritePitch === PITCH && spriteColorKey === threadPeak.join(',')) return
+		if (SPRITES.length && spritePitch === PITCH && spriteColorKey === spriteKey()) return
 		buildSprites()
 	}
 
@@ -388,7 +417,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	}
 
 	function drawStitch(c: CanvasRenderingContext2D, s: Stitch): void {
-		c.save(); c.translate(s.x, s.y); c.rotate(s.ang); c.drawImage(SPRITES[s.idx], -SPRITE_W / 2, -SPRITE_H / 2); c.restore()
+		c.save(); c.translate(s.x, s.y); c.rotate(s.ang + spriteAngOffset); c.drawImage(SPRITES[s.idx], -SPRITE_W / 2, -SPRITE_H / 2); c.restore()
 	}
 	function drawAll(): void { const c = bgC.getContext('2d'); if (!c) return; for (const s of STITCHES) drawStitch(c, s) }
 	/** Clear the base canvas to transparent (no fabric, no contact shadow). */
@@ -691,6 +720,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			if (partial.fill !== undefined) { const f = clamp(partial.fill, 0.05, 1); if (f !== fill) { fill = f; geom = true } }
 			if (partial.pitch !== undefined && partial.pitch !== pitchOpt) { pitchOpt = partial.pitch; geom = true }
 			if (partial.threadColor !== undefined) { setThreadRamp(partial.threadColor); spritesOnly = true }
+			if (partial.stitchMode !== undefined && partial.stitchMode !== stitchMode && (STITCH_MODES as readonly string[]).includes(partial.stitchMode)) { stitchMode = partial.stitchMode as StitchMode; spritesOnly = true }
 			if (partial.sewRate !== undefined) sewRate = Math.max(1, partial.sewRate)
 			if (partial.sewStyle !== undefined) sewStyle = partial.sewStyle === 'hand' ? 'hand' : 'machine'
 			if (partial.animate !== undefined) animate = partial.animate

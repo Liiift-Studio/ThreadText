@@ -25,6 +25,8 @@ interface ThreadTextFramerProps {
 	fill: number
 	/** Sew-in style: 'machine' satin rows, or 'hand' single-thread. */
 	sewStyle: "machine" | "hand"
+	/** Stitch texture: satin / cross / chain / running. */
+	stitchMode: "satin" | "cross" | "chain" | "running"
 	/** Satin cross-rows laid per second during the sew-in. */
 	sewRate: number
 	/** Cursor-following sheen on the overlay canvas. */
@@ -47,6 +49,7 @@ export default function ThreadText(props: Partial<ThreadTextFramerProps>) {
 		threadColor = "#fffbf3",
 		fill = 0.9,
 		sewStyle = "machine",
+		stitchMode = "satin",
 		sewRate = 110,
 		sheen = true,
 		animate = true,
@@ -63,13 +66,13 @@ export default function ThreadText(props: Partial<ThreadTextFramerProps>) {
 	useEffect(() => {
 		const el = ref.current
 		if (!el) return
-		const instance = createThreadText(el, { text, font: fontFamily, weight, threadColor, fill, sewStyle, sewRate, sheen: live ? sheen : false, animate: live ? animate : false })
+		const instance = createThreadText(el, { text, font: fontFamily, weight, threadColor, fill, sewStyle, stitchMode, sewRate, sheen: live ? sheen : false, animate: live ? animate : false })
 		instRef.current = instance
 		return () => instance.destroy()
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [live])
 
-	useEffect(() => { instRef.current?.update({ font: fontFamily, weight, threadColor, fill, sewStyle, sewRate, sheen: live ? sheen : false, animate: live ? animate : false }) }, [fontFamily, weight, threadColor, fill, sewStyle, sewRate, sheen, animate, live])
+	useEffect(() => { instRef.current?.update({ font: fontFamily, weight, threadColor, fill, sewStyle, stitchMode, sewRate, sheen: live ? sheen : false, animate: live ? animate : false }) }, [fontFamily, weight, threadColor, fill, sewStyle, stitchMode, sewRate, sheen, animate, live])
 	useEffect(() => { instRef.current?.setText(text) }, [text])
 
 	return <div ref={ref} style={{ width: "100%" }} role="img" aria-label={text} />
@@ -83,6 +86,7 @@ addPropertyControls(ThreadText, {
 	threadColor: { type: ControlType.Color, title: "Thread", defaultValue: "#fffbf3" },
 	fill: { type: ControlType.Number, title: "Size", defaultValue: 0.9, min: 0.3, max: 1, step: 0.02, description: "Fraction of the width the word fills." },
 	sewStyle: { type: ControlType.Enum, title: "Sew style", options: ["machine", "hand"], optionTitles: ["Machine", "Hand"], defaultValue: "machine" },
+	stitchMode: { type: ControlType.Enum, title: "Stitch", options: ["satin", "cross", "chain", "running"], optionTitles: ["Satin", "Cross", "Chain", "Running"], defaultValue: "satin" },
 	sewRate: { type: ControlType.Number, title: "Sew rate", defaultValue: 110, min: 20, max: 400, step: 10, description: "Rows/stitches per second." },
 	sheen: { type: ControlType.Boolean, title: "Sheen", defaultValue: true },
 	animate: { type: ControlType.Boolean, title: "Sew-in", defaultValue: true },

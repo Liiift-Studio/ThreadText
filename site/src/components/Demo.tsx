@@ -55,8 +55,9 @@ export default function Demo() {
 	const [threadColor, setThreadColor] = useState("#fdf3df")
 	const [sheen, setSheen] = useState(true)
 	const [sewStyle, setSewStyle] = useState<'machine' | 'hand'>('machine')
+	const [stitchMode, setStitchMode] = useState<'satin' | 'cross' | 'chain' | 'running'>('satin')
 
-	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, sheen, sewStyle })
+	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, sheen, sewStyle, stitchMode })
 
 	// Create once; everything below is applied live.
 	useEffect(() => {
@@ -90,18 +91,18 @@ export default function Demo() {
 
 	// Live parameter changes — instant redraw, no re-sew.
 	useEffect(() => {
-		instRef.current?.update({ font, weight, fill, sewRate, threadColor, sheen, sewStyle })
-	}, [font, weight, fill, sewRate, threadColor, sheen, sewStyle])
+		instRef.current?.update({ font, weight, fill, sewRate, threadColor, sheen, sewStyle, stitchMode })
+	}, [font, weight, fill, sewRate, threadColor, sheen, sewStyle, stitchMode])
 
 	// Text changes (input or canvas typing).
 	useEffect(() => { instRef.current?.setText(text) }, [text])
 
-	// Replay so the chosen sew style is immediately visible (skip the initial mount).
+	// Replay so the chosen sew style / stitch texture is immediately visible (skip the initial mount).
 	const styleMounted = useRef(false)
 	useEffect(() => {
 		if (!styleMounted.current) { styleMounted.current = true; return }
 		instRef.current?.replay()
-	}, [sewStyle])
+	}, [sewStyle, stitchMode])
 
 	const replay = useCallback(() => instRef.current?.replay(), [])
 
@@ -168,6 +169,23 @@ export default function Demo() {
 								title={v === 'machine' ? 'Satin cross-rows fill each stroke in parallel — like a machine' : 'One letter at a time — enters at the top, works down, thin edges last, like hand embroidery'}
 								className="text-xs px-3 py-2 rounded-full border transition-opacity"
 								style={{ borderColor: 'currentColor', opacity: sewStyle === v ? 1 : 0.5, background: sewStyle === v ? 'var(--btn-bg)' : 'transparent' }}
+							>
+								{lbl}
+							</button>
+						))}
+					</div>
+				</div>
+				<div className="flex flex-col gap-1">
+					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Stitch</span>
+					<div role="group" aria-label="Stitch mode" className="flex flex-wrap gap-2">
+						{([['satin', 'Satin'], ['cross', 'Cross'], ['chain', 'Chain'], ['running', 'Running']] as const).map(([v, lbl]) => (
+							<button
+								key={v}
+								onClick={() => setStitchMode(v)}
+								aria-pressed={stitchMode === v}
+								title={`${lbl}-stitch texture`}
+								className="text-xs px-3 py-2 rounded-full border transition-opacity"
+								style={{ borderColor: 'currentColor', opacity: stitchMode === v ? 1 : 0.5, background: stitchMode === v ? 'var(--btn-bg)' : 'transparent' }}
 							>
 								{lbl}
 							</button>

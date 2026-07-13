@@ -23,7 +23,7 @@ export function useThreadText(options: ThreadTextOptions) {
 	const onTextChangeRef = useRef(options.onTextChange)
 	onTextChangeRef.current = options.onTextChange
 
-	const { text, font, weight, threadColor, pitch, fill, animate, sewStyle, sewRate, sheen, editable, reducedMotion } = options
+	const { text, font, weight, threadColor, pitch, fill, animate, sewStyle, stitchMode, sewRate, sheen, editable, reducedMotion } = options
 
 	// (Re)create only when reducedMotion changes (it's fixed at construction) or on mount.
 	useLayoutEffect(() => {
@@ -66,8 +66,8 @@ export function useThreadText(options: ThreadTextOptions) {
 
 	// Live option changes → update() (instant redraw, never a re-sew).
 	useEffect(() => {
-		instanceRef.current?.update({ font, weight, threadColor, pitch, fill, animate, sewStyle, sewRate, sheen, editable })
-	}, [font, weight, threadColor, pitch, fill, animate, sewStyle, sewRate, sheen, editable])
+		instanceRef.current?.update({ font, weight, threadColor, pitch, fill, animate, sewStyle, stitchMode, sewRate, sheen, editable })
+	}, [font, weight, threadColor, pitch, fill, animate, sewStyle, stitchMode, sewRate, sheen, editable])
 
 	// Text changes → setText.
 	useEffect(() => {

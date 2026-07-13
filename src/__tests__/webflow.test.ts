@@ -7,8 +7,8 @@ import { THREAD_TEXT_CLASSES } from '../core/types'
 function makeCtxStub() {
 	const gradient = { addColorStop() {} }
 	return {
-		fillStyle: '', font: '', textAlign: '', textBaseline: '', globalCompositeOperation: '', globalAlpha: 1, filter: '',
-		clearRect() {}, fillRect() {}, fillText() {}, beginPath() {}, moveTo() {}, lineTo() {}, arc() {}, closePath() {}, fill() {},
+		fillStyle: '', strokeStyle: '', lineWidth: 1, lineCap: '', font: '', textAlign: '', textBaseline: '', globalCompositeOperation: '', globalAlpha: 1, filter: '',
+		clearRect() {}, fillRect() {}, fillText() {}, beginPath() {}, moveTo() {}, lineTo() {}, arc() {}, ellipse() {}, closePath() {}, fill() {}, stroke() {},
 		save() {}, restore() {}, translate() {}, rotate() {}, drawImage() {},
 		createLinearGradient() { return gradient }, createRadialGradient() { return gradient },
 		measureText(s: string) { return { width: (s ? s.length : 1) * 10 } },

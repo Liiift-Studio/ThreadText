@@ -39,6 +39,14 @@ export interface ThreadTextOptions {
 	 *   serifs and terminals last — the way a person embroiders a shape.
 	 */
 	sewStyle?: 'machine' | 'hand'
+	/**
+	 * The stitch texture filling each stroke:
+	 * - **'satin'** (default) — smooth parallel threads across the stroke (raised satin floss).
+	 * - **'cross'** — little X's, like cross-stitch.
+	 * - **'chain'** — a field of looped links.
+	 * - **'running'** — short dashes, a sparser hand-run look.
+	 */
+	stitchMode?: 'satin' | 'cross' | 'chain' | 'running'
 	/** Satin cross-rows (machine) or stitches (hand) laid per second during the sew-in. (default: 110) */
 	sewRate?: number
 	/** Enable the cursor-following radial sheen on the overlay canvas. (default: true) */
