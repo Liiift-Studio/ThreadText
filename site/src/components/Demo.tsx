@@ -3,7 +3,7 @@
 // Interactive threadText demo — type a word (in the input or straight on the artwork) and
 // watch it embroider itself. Font, size, weight, sew-rate, sheen, and thread colour are all
 // live: they redraw instantly via update() without re-running the sew-in animation.
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback, useDeferredValue } from "react"
 import { createThreadText } from "@liiift-studio/threadtext"
 import type { ThreadTextInstance } from "@liiift-studio/threadtext"
 
@@ -89,10 +89,15 @@ export default function Demo() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
+	// Defer the geometry-heavy slider values so dragging Weight/Size coalesces rebuilds
+	// (React skips intermediate values under load) instead of running the full pipeline per pixel.
+	const dWeight = useDeferredValue(weight)
+	const dFill = useDeferredValue(fill)
+
 	// Live parameter changes — instant redraw, no re-sew.
 	useEffect(() => {
-		instRef.current?.update({ font, weight, fill, sewRate, threadColor, sheen, sewStyle, stitchMode })
-	}, [font, weight, fill, sewRate, threadColor, sheen, sewStyle, stitchMode])
+		instRef.current?.update({ font, weight: dWeight, fill: dFill, sewRate, threadColor, sheen, sewStyle, stitchMode })
+	}, [font, dWeight, dFill, sewRate, threadColor, sheen, sewStyle, stitchMode])
 
 	// Text changes (input or canvas typing).
 	useEffect(() => { instRef.current?.setText(text) }, [text])
