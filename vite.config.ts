@@ -8,6 +8,10 @@ export default defineConfig({
 		react(),
 		dts({ include: ['src'], exclude: ['src/__tests__/**'], rollupTypes: true }),
 	],
+	// NOTE: do NOT enable esbuild keepNames — it injects a `__name(fn, "…")` helper reference into
+	// function bodies, which breaks the runtime Worker assembled from Function.toString() (the helper
+	// isn't defined in the worker scope). esbuild's default naming already emits self-contained,
+	// mutually-consistent `function X(){}` declarations, which is what the worker assembly needs.
 	build: {
 		lib: {
 			entry: 'src/index.ts',

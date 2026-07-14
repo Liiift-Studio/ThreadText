@@ -4,6 +4,8 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+	// Do NOT enable esbuild keepNames — its __name() helper injection breaks the runtime-assembled
+	// Web Worker (Function.toString()). Default naming emits self-contained function declarations.
 	build: {
 		// Do not wipe dist/ — the library build (vite.config.ts) writes index.js/.cjs there too.
 		emptyOutDir: false,

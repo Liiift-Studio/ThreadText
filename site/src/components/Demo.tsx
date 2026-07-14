@@ -56,8 +56,9 @@ export default function Demo() {
 	const [sheen, setSheen] = useState(true)
 	const [sewStyle, setSewStyle] = useState<'machine' | 'hand'>('machine')
 	const [stitchMode, setStitchMode] = useState<'satin' | 'cross' | 'chain' | 'running'>('satin')
+	const [opsz, setOpsz] = useState(40)
 
-	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, sheen, sewStyle, stitchMode })
+	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, sheen, sewStyle, stitchMode, axes: { opsz } })
 
 	// Create once; everything below is applied live.
 	useEffect(() => {
@@ -93,11 +94,12 @@ export default function Demo() {
 	// (React skips intermediate values under load) instead of running the full pipeline per pixel.
 	const dWeight = useDeferredValue(weight)
 	const dFill = useDeferredValue(fill)
+	const dOpsz = useDeferredValue(opsz)
 
 	// Live parameter changes — instant redraw, no re-sew.
 	useEffect(() => {
-		instRef.current?.update({ font, weight: dWeight, fill: dFill, sewRate, threadColor, sheen, sewStyle, stitchMode })
-	}, [font, dWeight, dFill, sewRate, threadColor, sheen, sewStyle, stitchMode])
+		instRef.current?.update({ font, weight: dWeight, fill: dFill, sewRate, threadColor, sheen, sewStyle, stitchMode, axes: { opsz: dOpsz } })
+	}, [font, dWeight, dFill, sewRate, threadColor, sheen, sewStyle, stitchMode, dOpsz])
 
 	// Text changes (input or canvas typing).
 	useEffect(() => { instRef.current?.setText(text) }, [text])
@@ -162,6 +164,7 @@ export default function Demo() {
 			<div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
 				<Slider label="Size" value={fill} min={0.4} max={1} step={0.02} fmt={v => `${Math.round(v * 100)}%`} onChange={setFill} title="Fraction of the width the word fills — refits to the container on resize" />
 				<Slider label="Weight" value={weight} min={200} max={900} step={10} onChange={setWeight} title="Numeric font weight — heavier strokes give broader satin bands" />
+				<Slider label="Optical" value={opsz} min={9} max={144} step={1} onChange={setOpsz} title="Variable-font optical size (opsz axis) — visible on fonts that have it, e.g. the display serif" />
 				<Slider label="Sew rate" value={sewRate} min={30} max={320} step={10} fmt={v => `${v}/s`} onChange={setSewRate} title="How fast the sew-in animation lays stitches — hit Replay to watch it" />
 				<div className="flex flex-col gap-1">
 					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Sew style</span>

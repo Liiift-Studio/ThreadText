@@ -75,7 +75,8 @@ import { ThreadText } from '@liiift-studio/threadtext'
 ```
 
 Thread colour, `fill` (size — the word re-fits to the container width on load/resize),
-`weight`, `font`, `stitchMode` (`'satin'` · `'cross'` · `'chain'` · `'running'` textures),
+`weight`, `axes` (variable-font `opsz`/custom axes via canvas `fontVariationSettings`),
+`font`, `stitchMode` (`'satin'` · `'cross'` · `'chain'` · `'running'` textures),
 `sewStyle` (`'machine'` satin rows in parallel, or `'hand'` — one letter at a time, entering at
 the top and working down, edges last), `sewRate`, `sheen`, `animate`, and
 `editable` (type straight on

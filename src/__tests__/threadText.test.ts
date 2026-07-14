@@ -151,6 +151,12 @@ describe('createThreadText', () => {
 		expect(latest).toBe('Gox')
 	})
 
+	it('accepts variable-font axes without throwing', () => {
+		inst = createThreadText(host, { text: 'Ax', axes: { opsz: 40, SOFT: 60 } })
+		expect(host.querySelectorAll('canvas').length).toBe(2)
+		expect(() => inst!.update({ axes: { opsz: 120 } })).not.toThrow()
+	})
+
 	it('clamps out-of-range fill and weight without throwing', () => {
 		inst = createThreadText(host, { text: 'Hi', fill: 5, weight: 9999 })
 		expect(host.querySelectorAll('canvas').length).toBe(2)

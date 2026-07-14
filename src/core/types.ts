@@ -15,6 +15,14 @@ export interface ThreadTextOptions {
 	font?: string
 	/** Numeric font weight passed to the canvas `font` shorthand (100–900). (default: 680) */
 	weight?: number
+	/**
+	 * Variable-font axis values applied to the rasterised glyphs, e.g. `{ opsz: 40, SOFT: 60 }`.
+	 * Uses the canvas `fontVariationSettings` API (Chrome/Edge/Safari) so the browser's own
+	 * variable rendering drives the stitch shapes; silently ignored where unsupported (the font's
+	 * default instance is used). Note: numeric `weight` already drives the `wght` axis via the
+	 * standard font shorthand — reach for `axes` for `opsz` and custom axes (`SOFT`, `WONK`, …).
+	 */
+	axes?: Record<string, number>
 	/** Floss (thread) colour — the lit crest of each thread. (default: warm white '#fffbf3') */
 	threadColor?: string
 	/**

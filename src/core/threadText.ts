@@ -29,11 +29,9 @@ export function vnoise(x: number, y: number): number {
 	return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v
 }
 
-// Sentinel "infinite" distance for the EDT.
-const INF = 1e20
-
 /** One-dimensional squared-distance transform (Felzenszwalb–Huttenlocher). */
 function edt1d(f: Float64Array, n: number, d: Float64Array, v: Int32Array, z: Float64Array): void {
+	const INF = 1e20   // local (not module-scoped) so this fn is self-contained inside the Web Worker
 	let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF
 	for (let q = 1; q < n; q++) {
 		let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k])
@@ -49,6 +47,7 @@ function edt1d(f: Float64Array, n: number, d: Float64Array, v: Int32Array, z: Fl
  * nearest outside pixel. Two-pass separable EDT over a W×H binary mask.
  */
 export function distanceInside(mask: Uint8Array, W: number, H: number): Float32Array {
+	const INF = 1e20   // local so this fn is self-contained inside the Web Worker
 	const grid = new Float64Array(W * H)
 	for (let i = 0; i < W * H; i++) grid[i] = mask[i] ? INF : 0
 	const md = Math.max(W, H)
@@ -114,6 +113,51 @@ function primaryOf(font: string): string {
 	return (font.split(',')[0] || 'serif').trim().replace(/^["']|["']$/g, '')
 }
 
+/**
+ * The heavy geometry pass: from a glyph's rasterised alpha (RGBA bytes) build the frayed mask,
+ * the across-stroke flow field (double-angle-smoothed), and the dome-shade map. Pure and DOM-free
+ * so it runs identically on the main thread or inside a Web Worker. Depends only on {@link vnoise},
+ * {@link distanceInside}, {@link boxBlur} and Math — kept self-contained for worker assembly.
+ */
+function computeGeometry(alpha: Uint8ClampedArray, W: number, H: number): { mask: Uint8Array; ex: Float32Array; ey: Float32Array; shade: Float32Array } {
+	const mask = new Uint8Array(W * H)
+	for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+		const i = y * W + x, a = alpha[i * 4 + 3] / 255
+		const n = vnoise(x * 0.5, y * 0.5) * 0.22 + vnoise(x * 1.8, y * 1.8) * 0.10
+		mask[i] = a > (0.5 + (n - 0.16)) ? 1 : 0
+	}
+	const dist = distanceInside(mask, W, H)
+	const distS = new Float32Array(W * H)
+	for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+		const i = y * W + x
+		distS[i] = (dist[i] * 4 + dist[i - 1] + dist[i + 1] + dist[i - W] + dist[i + W]) / 8
+	}
+	const C2 = new Float32Array(W * H), S2 = new Float32Array(W * H)
+	const gxF = new Float32Array(W * H), gyF = new Float32Array(W * H)
+	for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+		const i = y * W + x; if (!mask[i]) continue
+		const gx = (distS[i + 1] - distS[i - 1]) * 0.5, gy = (distS[i + W] - distS[i - W]) * 0.5
+		gxF[i] = gx; gyF[i] = gy; C2[i] = gx * gx - gy * gy; S2[i] = 2 * gx * gy
+	}
+	const R = Math.max(7, Math.round(H * 0.05))
+	const C2b = boxBlur(C2, W, H, R, 2), S2b = boxBlur(S2, W, H, R, 2)
+	const ex = new Float32Array(W * H), ey = new Float32Array(W * H)
+	for (let i = 0; i < W * H; i++) { if (!mask[i]) continue; const th = 0.5 * Math.atan2(S2b[i], C2b[i]); ex[i] = Math.cos(th); ey[i] = Math.sin(th) }
+	const PAD = Math.max(9, H * 0.04)
+	const shade = new Float32Array(W * H)
+	const Lx = -0.45, Ly = -0.62, Lz = 0.64
+	for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+		const i = y * W + x; if (!mask[i]) continue
+		let gx = gxF[i], gy = gyF[i]; const gl = Math.hypot(gx, gy) || 1; gx /= gl; gy /= gl
+		const dd = distS[i]; const domeSlope = (1 - Math.min(dd / PAD, 1)) * 1.25
+		let nx = -gx * domeSlope, ny = -gy * domeSlope; const nz = 1.5; const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl
+		let dif = nx * Lx + ny * Ly + (nz / nl) * Lz; if (dif < 0) dif = 0
+		const ao = Math.min(1, 0.45 + 0.55 * Math.min(dd / (PAD * 0.7), 1))
+		shade[i] = Math.min(1.12, (0.5 + 0.75 * dif) * ao)
+	}
+	return { mask, ex, ey, shade }
+}
+
 // A single laid stitch: position, thread angle, and pre-shaded sprite brightness bucket.
 interface Stitch { x: number; y: number; ang: number; idx: number }
 
@@ -146,8 +190,21 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let animate = opts.animate ?? true
 	let editable = opts.editable ?? false
 	let pitchOpt = opts.pitch
+	let axes = opts.axes
 	let onTextChange = opts.onTextChange
 	let primaryFamily = primaryOf(font)
+
+	/** Variable-font axes as a CSS fontVariationSettings string (e.g. `"opsz" 40, "SOFT" 60`). */
+	function axesStr(): string {
+		if (!axes) return ''
+		const parts: string[] = []
+		for (const k in axes) { const v = axes[k]; if (typeof v === 'number' && isFinite(v)) parts.push(`"${k}" ${v}`) }
+		return parts.join(', ')
+	}
+	/** Apply the current axes to a 2D context via fontVariationSettings, where the browser supports it. */
+	function applyVar(ctx: CanvasRenderingContext2D): void {
+		if ('fontVariationSettings' in ctx) (ctx as unknown as { fontVariationSettings: string }).fontVariationSettings = axesStr() || 'normal'
+	}
 
 	const REDUCED = opts.reducedMotion ??
 		!!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
@@ -214,6 +271,13 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let rafId = 0, running = false, lastTS = 0
 	let destroyed = false, booted = false
 
+	// Web Worker geometry offload (best-effort; falls back to synchronous build on any failure).
+	let worker: Worker | null = null
+	let workerUrl = ''
+	let workerReady = false
+	let reqId = 0, pendingSew = false
+	let workerTimer: ReturnType<typeof setTimeout> | undefined
+
 	// ── fit-to-width sizing: derive FS from the container width, height from the glyphs ──
 	function layout(): void {
 		const rect = container.getBoundingClientRect()
@@ -224,13 +288,14 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 
 		// Font size (CSS px) so the word spans fill × container width.
 		let refW100 = 100
-		if (mc) { mc.font = `${weight} 100px ${font}`; refW100 = mc.measureText(ref).width || 100 }
+		if (mc) { mc.font = `${weight} 100px ${font}`; applyVar(mc); refW100 = mc.measureText(ref).width || 100 }
 		const fsCss = Math.max(8, (100 * (cssW * fill)) / refW100)
 
 		// Height (CSS px) from the glyph extent around the middle baseline, plus a little padding.
 		let asc = fsCss * 0.62, desc = fsCss * 0.62, refWfs = cssW * fill
 		if (mc) {
 			mc.font = `${weight} ${fsCss}px ${font}`
+			applyVar(mc)
 			const m = mc.measureText(ref)
 			refWfs = m.width || refWfs
 			if (m.actualBoundingBoxAscent > 0) asc = m.actualBoundingBoxAscent
@@ -331,71 +396,36 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		buildSprites()
 	}
 
-	// ── geometry pass for the current word ──
-	function build(): void {
-		if (!OFFCTX) return
+	// ── geometry pass, split so it can run inline or in a Web Worker ──
+	/** Rasterise the current word into the offscreen scratch and return its RGBA bytes. */
+	function rasterizeGlyph(): Uint8ClampedArray | null {
+		if (!OFFCTX) return null
 		const o = OFFCTX
 		o.clearRect(0, 0, W, H)
 		o.fillStyle = '#fff'; o.textAlign = 'left'; o.textBaseline = 'middle'
 		o.font = `${weight} ${FS}px ${font}`
+		applyVar(o)
 		o.fillText(text, ANCHOR_X, H * 0.5)
-		const img = o.getImageData(0, 0, W, H).data
-
-		// frayed mask
-		const mask = new Uint8Array(W * H)
-		for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-			const i = y * W + x, a = img[i * 4 + 3] / 255
-			const n = vnoise(x * 0.5, y * 0.5) * 0.22 + vnoise(x * 1.8, y * 1.8) * 0.10
-			mask[i] = a > (0.5 + (n - 0.16)) ? 1 : 0
-		}
-		MASK = mask
-
-		// distance + smoothed
-		const dist = distanceInside(mask, W, H)
-		const distS = new Float32Array(W * H)
-		for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
-			const i = y * W + x
-			distS[i] = (dist[i] * 4 + dist[i - 1] + dist[i + 1] + dist[i - W] + dist[i + W]) / 8
-		}
-
-		// orientation field, smoothed in double-angle space
-		const C2 = new Float32Array(W * H), S2 = new Float32Array(W * H)
-		const gxF = new Float32Array(W * H), gyF = new Float32Array(W * H)
-		for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
-			const i = y * W + x; if (!mask[i]) continue
-			const gx = (distS[i + 1] - distS[i - 1]) * 0.5, gy = (distS[i + W] - distS[i - W]) * 0.5
-			gxF[i] = gx; gyF[i] = gy; C2[i] = gx * gx - gy * gy; S2[i] = 2 * gx * gy
-		}
-		const R = Math.max(7, Math.round(H * 0.05))
-		const C2b = boxBlur(C2, W, H, R, 2), S2b = boxBlur(S2, W, H, R, 2)
-		EX = new Float32Array(W * H); EY = new Float32Array(W * H)
-		for (let i = 0; i < W * H; i++) { if (!mask[i]) continue; const th = 0.5 * Math.atan2(S2b[i], C2b[i]); EX[i] = Math.cos(th); EY[i] = Math.sin(th) }
-
-		// dome-shade map (raised 3D, fixed top-left light + edge AO)
-		const PAD = Math.max(9, H * 0.04)
-		const shade = new Float32Array(W * H)
-		const Lx = -0.45, Ly = -0.62, Lz = 0.64
-		for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
-			const i = y * W + x; if (!mask[i]) continue
-			let gx = gxF[i], gy = gyF[i]; const gl = Math.hypot(gx, gy) || 1; gx /= gl; gy /= gl
-			const dd = distS[i]; const domeSlope = (1 - Math.min(dd / PAD, 1)) * 1.25
-			let nx = -gx * domeSlope, ny = -gy * domeSlope; const nz = 1.5; const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl
-			let dif = nx * Lx + ny * Ly + (nz / nl) * Lz; if (dif < 0) dif = 0
-			const ao = Math.min(1, 0.45 + 0.55 * Math.min(dd / (PAD * 0.7), 1))
-			shade[i] = Math.min(1.12, (0.5 + 0.75 * dif) * ao)
-		}
-		SHADE = shade
-
-		// solid white mask canvas (for cursor-sheen clipping)
+		return o.getImageData(0, 0, W, H).data
+	}
+	/** Store the computed geometry and (re)build the solid mask canvas used to clip the sheen. */
+	function applyGeometry(g: { mask: Uint8Array; ex: Float32Array; ey: Float32Array; shade: Float32Array }): void {
+		MASK = g.mask; EX = g.ex; EY = g.ey; SHADE = g.shade
 		MASKCV = document.createElement('canvas'); MASKCV.width = W; MASKCV.height = H
 		const mc = MASKCV.getContext('2d')
 		if (mc) {
 			const md = mc.createImageData(W, H)
-			for (let i = 0; i < W * H; i++) if (mask[i]) {
+			for (let i = 0; i < W * H; i++) if (MASK[i]) {
 				md.data[i * 4] = 255; md.data[i * 4 + 1] = 255; md.data[i * 4 + 2] = 255; md.data[i * 4 + 3] = 255
 			}
 			mc.putImageData(md, 0, 0)
 		}
+	}
+	/** Synchronous geometry build (fallback when no worker). */
+	function build(): void {
+		const alpha = rasterizeGlyph()
+		if (!alpha) return
+		applyGeometry(computeGeometry(alpha, W, H))
 	}
 
 	// ── stitch list: sample the mask on a jittered grid ──
@@ -544,7 +574,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	function updateCaret(): void {
 		if (!editable || !caretEl) return
 		const c = bgC.getContext('2d'); if (!c) return
-		c.font = `${weight} ${FS}px ${font}`
+		c.font = `${weight} ${FS}px ${font}`; applyVar(c)
 		const wWidth = c.measureText(text).width
 		const scale = (bgC.clientWidth || W) / W
 		const capH = FS * 0.7
@@ -633,12 +663,37 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	}
 
 	// ── full render: fit to width, rebuild geometry, then sew or draw instantly ──
-	function render(sew: boolean): void {
-		layout(); ensureScratch(); ensureSprites(); build(); buildStitchList()
+	/** Given the geometry is in place, build the stitch list and paint (sew-in or instant). */
+	function finishDraw(sew: boolean): void {
+		buildStitchList()
 		if (sew) startReveal()
 		else { resetBg(); drawAll(); anim.on = false }
 		if (editInput && editInput.value !== text) editInput.value = text
 		updateCaret(); sheenDirty = true; kick()
+	}
+	function render(sew: boolean): void {
+		layout(); ensureScratch(); ensureSprites()
+		const alpha = rasterizeGlyph()
+		if (!alpha) { finishDraw(sew); return }
+		if (worker && workerReady) {
+			// Offload the geometry pipeline; the response (matched by id) finishes the paint.
+			const id = ++reqId; pendingSew = sew
+			if (workerTimer) clearTimeout(workerTimer)
+			workerTimer = setTimeout(() => workerFallback(id), 800)   // dead-worker guard
+			try { worker.postMessage({ id, W, H, alpha }, [alpha.buffer]) }
+			catch { workerFallback(id) }
+			return
+		}
+		applyGeometry(computeGeometry(alpha, W, H))   // synchronous fallback
+		finishDraw(sew)
+	}
+	/** A posted worker request didn't come back (dead/errored/CSP) — disable it and render inline. */
+	function workerFallback(id: number): void {
+		if (id !== reqId || destroyed) return
+		if (workerTimer) { clearTimeout(workerTimer); workerTimer = undefined }
+		workerReady = false
+		const alpha = rasterizeGlyph()   // the posted buffer was transferred away; re-rasterise
+		if (alpha) { applyGeometry(computeGeometry(alpha, W, H)); finishDraw(pendingSew) }
 	}
 
 	/** Set text and redraw instantly (no sew-in). `notify` fires onTextChange (internal edits only). */
@@ -666,12 +721,45 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		fontTimers.add(timer)
 	}
 
+	// ── Web Worker geometry offload (best-effort, self-healing) ──
+	function onWorkerMessage(ev: MessageEvent): void {
+		const d = ev.data
+		if (d && d.type === 'pong') { workerReady = true; return }
+		if (!d || destroyed || d.id !== reqId) return   // stale / cancelled / superseded
+		if (workerTimer) { clearTimeout(workerTimer); workerTimer = undefined }
+		applyGeometry({ mask: d.mask, ex: d.ex, ey: d.ey, shade: d.shade })
+		finishDraw(pendingSew)
+	}
+	function setupWorker(): void {
+		if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) return
+		try {
+			// Assemble a self-contained worker from the pure helpers (names preserved via esbuild
+			// keepNames). The ping validates the whole pipeline before we trust the worker, so a
+			// broken assembly (e.g. from an unexpected minifier transform) never flips workerReady.
+			// Include the helpers as raw declarations (their code-names stay mutually consistent, so
+			// cross-references resolve), and bind computeGeometry to a fixed name we control — its
+			// own code-name is minified, so the handler can't hard-code it.
+			const src = `${hash2}\n${vnoise}\n${edt1d}\n${distanceInside}\n${boxBlur}\n`
+				+ `var __cg=${computeGeometry};\n`
+				+ `self.onmessage=function(ev){var d=ev.data;`
+				+ `if(d&&d.type==='ping'){try{__cg(new Uint8ClampedArray(4),1,1);self.postMessage({type:'pong'})}catch(e){}return}`
+				+ `var g=__cg(d.alpha,d.W,d.H);`
+				+ `self.postMessage({id:d.id,mask:g.mask,ex:g.ex,ey:g.ey,shade:g.shade},[g.mask.buffer,g.ex.buffer,g.ey.buffer,g.shade.buffer])};`
+			workerUrl = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }))
+			worker = new Worker(workerUrl)
+			worker.onmessage = onWorkerMessage
+			worker.onerror = () => { workerReady = false }
+			worker.postMessage({ type: 'ping' })
+		} catch { worker = null }
+	}
+
 	// ── boot ──
 	function firstPaint(): void {
 		if (destroyed) return
-		render(true)   // sew-in on mount (when animate)
+		render(true)   // sew-in on mount (when animate) — synchronous; the worker takes over later renders
 		booted = true
 	}
+	setupWorker()
 	if (editable) { editable = false; applyEditable(true) }
 	if (sheenOn) {
 		container.addEventListener('pointermove', onPointerMove, { passive: true })
@@ -719,6 +807,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			if (partial.weight !== undefined) { const w = clamp(partial.weight, 1, 1000); if (w !== weight) { weight = w; geom = true } }
 			if (partial.fill !== undefined) { const f = clamp(partial.fill, 0.05, 1); if (f !== fill) { fill = f; geom = true } }
 			if (partial.pitch !== undefined && partial.pitch !== pitchOpt) { pitchOpt = partial.pitch; geom = true }
+			if (partial.axes !== undefined) { axes = partial.axes; geom = true }
 			if (partial.threadColor !== undefined) { setThreadRamp(partial.threadColor); spritesOnly = true }
 			if (partial.stitchMode !== undefined && partial.stitchMode !== stitchMode && (STITCH_MODES as readonly string[]).includes(partial.stitchMode)) { stitchMode = partial.stitchMode as StitchMode; spritesOnly = true }
 			if (partial.sewRate !== undefined) sewRate = Math.max(1, partial.sewRate)
@@ -738,8 +827,11 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			running = false
 			cancelAnimationFrame(rafId)
 			clearTimeout(resizeTimer)
+			if (workerTimer) clearTimeout(workerTimer)
 			for (const t of fontTimers) clearTimeout(t)
 			fontTimers.clear()
+			if (worker) { worker.terminate(); worker = null }
+			if (workerUrl) { try { URL.revokeObjectURL(workerUrl) } catch { /* ignore */ } workerUrl = '' }
 			window.removeEventListener('resize', onResize)
 			container.removeEventListener('pointermove', onPointerMove)
 			container.removeEventListener('pointerleave', onPointerLeave)
