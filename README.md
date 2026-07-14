@@ -31,7 +31,7 @@ Each step below is what actually produces the thread look — the plain-language
 1. **Draw the glyphs** to an offscreen canvas from the loaded font (rasterise; variable-font axes applied via canvas `fontVariationSettings`).
 2. **Measure how deep inside each stroke every pixel is** (an exact Euclidean *signed-distance field*).
 3. **Work out which way the thread should run** — always *across* the stroke, fanning smoothly around curves (a *flow field*, smoothed in double-angle orientation space so the two opposite edges of a stroke agree instead of cancelling).
-4. **Lay the stitches** by stamping many small, pre-lit thread images along that flow (a reused set of *pre-shaded thread sprites* — a handful of variants placed as thousands of individual stitches).
+4. **Lay the stitches** by stamping many small, pre-lit thread images along that flow (a reused set of *pre-shaded thread sprites* — ~20 brightness variants placed as thousands of individual stitches).
 5. **Lift it into 3D** so each thread catches light and casts a soft crease (a *dome-shade / normal map* over the transparent ground).
 6. **Sew it in** one cross-row at a time as an animation, and add a **subtle cursor-driven sheen** as you move over it.
 
@@ -78,7 +78,7 @@ For a custom container or your own imperative control, use the hook — it creat
 import { useThreadText } from '@liiift-studio/threadtext'
 
 function Stitched() {
-  const ref = useThreadText({ text: 'Thread', weight: 680, threadColor: '#e6c200' })
+  const ref = useThreadText<HTMLDivElement>({ text: 'Thread', weight: 680, threadColor: '#e6c200' })
   return <div ref={ref} style={{ width: '100%' }} />
 }
 ```
@@ -107,7 +107,7 @@ The bundle auto-initialises every `[data-threadtext]` element and exposes a smal
 
 ## Options
 
-All fields on `ThreadTextOptions` — change any of them live with `instance.update(...)` (it redraws instantly, without re-running the sew-in):
+All fields on `ThreadTextOptions`. Most can be changed live with `instance.update(...)` — colour, font, weight, size (`fill`), pitch, stitch mode, sew style/rate, sheen, axes and editability all redraw instantly without re-running the sew-in. Two exceptions: **`text`** changes go through `instance.setText(...)`, and **`reducedMotion`** is fixed at construction (changing it recreates the instance).
 
 - **`text`** — the word to embroider.
 - **`font`** — CSS `font-family` of an already-loaded font; its glyph geometry drives the stitch flow.
@@ -154,6 +154,7 @@ Source layout:
 
 | Path | What it is |
 |---|---|
+| `src/index.ts` | Public exports (`createThreadText`, `useThreadText`, `ThreadText`, `THREAD_TEXT_CLASSES`) |
 | `src/core/threadText.ts` | Framework-agnostic renderer (`createThreadText`) — no React imports |
 | `src/core/types.ts` | `ThreadTextOptions`, `ThreadTextInstance`, `THREAD_TEXT_CLASSES` |
 | `src/react/` | `useThreadText` hook + `<ThreadText>` component |
@@ -162,6 +163,8 @@ Source layout:
 | `src/__tests__/` | vitest suites (core, worker assembly, webflow embed) |
 
 The landing site + interactive demo live in `site/` (Next.js). Issues and PRs: [github.com/Liiift-Studio/ThreadText/issues](https://github.com/Liiift-Studio/ThreadText/issues).
+
+> **Contributing note:** this repo is a submodule of the [type-tools](https://github.com/Liiift-Studio/type-tools) monorepo, and the files under `site/` config, `vercel.json`, and `.gitignore` are **auto-synced from the parent** (`type-tools/shared/`) — edits to those here are overwritten on the next sync. The package source (`src/`) and the per-tool site files (`site/src/app/page.tsx`, `Demo.tsx`, `layout.tsx`, `globals.css`) are safe to edit directly.
 
 ---
 

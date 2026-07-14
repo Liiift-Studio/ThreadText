@@ -12,11 +12,13 @@ import type { ThreadTextInstance, ThreadTextOptions } from '../core/types'
  * container width via ResizeObserver, and tears down on unmount. Only `reducedMotion`
  * (fixed at creation) forces a fresh instance.
  *
+ * @typeParam T - the container element type (default `HTMLElement`); pass e.g.
+ * `useThreadText<HTMLDivElement>(...)` so the returned ref attaches cleanly to a `<div>`.
  * @param options - {@link ThreadTextOptions} for the renderer.
  * @returns A ref to attach to the target container element.
  */
-export function useThreadText(options: ThreadTextOptions) {
-	const ref = useRef<HTMLElement>(null)
+export function useThreadText<T extends HTMLElement = HTMLElement>(options: ThreadTextOptions) {
+	const ref = useRef<T>(null)
 	const instanceRef = useRef<ThreadTextInstance | null>(null)
 	const optionsRef = useRef(options)
 	optionsRef.current = options
