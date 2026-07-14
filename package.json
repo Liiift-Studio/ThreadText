@@ -1,6 +1,6 @@
 {
 	"name": "@liiift-studio/threadtext",
-	"version": "0.4.1",
+	"version": "0.4.2",
 	"description": "Render any text as photorealistic procedural satin-stitch embroidery, in real time in the browser, from the font's glyph geometry",
 	"type": "module",
 	"main": "dist/index.cjs",
