@@ -92,21 +92,26 @@ async function main() {
 	await shot("stitch-modes.png")
 
 	// 3) Sew-in GIF — the signature animation, captured frame by frame.
-	console.log("Sew-in GIF…")
-	await page.evaluate((o) => window.mount(o), {
+	// The GIF must survive its own FIRST frame (GitHub/npm often show the poster, not motion),
+	// so we lead with a few frames of the FINISHED word, then play the sew-in, then hold on the
+	// finished piece. Poster = a recognisable embroidered word, not an empty canvas.
+	const gifScene = {
 		layout: "single",
 		common: { font: '"Fraunces", Georgia, serif', threadColor: "#e7c56a", weight: 600, sheen: false },
-		options: { text: "Sew", fill: 0.8, animate: true, sewStyle: "machine", sewRate: 90, axes: { opsz: 120 } },
-	})
-	const FRAMES = 42, INTERVAL = 55
-	for (let i = 0; i < FRAMES; i++) {
-		await page.locator(".stage").screenshot({ path: join(frameDir, `f${String(i).padStart(3, "0")}.png`) })
-		await page.waitForTimeout(INTERVAL)
+		options: { text: "Sew", fill: 0.8, sewStyle: "machine", sewRate: 90, axes: { opsz: 120 } },
 	}
-	// A few hold frames on the finished piece so the loop breathes.
-	for (let i = FRAMES; i < FRAMES + 12; i++) {
-		await page.locator(".stage").screenshot({ path: join(frameDir, `f${String(i).padStart(3, "0")}.png`) })
-	}
+	let f = 0
+	const grab = () => page.locator(".stage").screenshot({ path: join(frameDir, `f${String(f++).padStart(3, "0")}.png`) })
+
+	console.log("Sew-in GIF (poster)…")
+	await page.evaluate((o) => window.mount({ ...o, options: { ...o.options, animate: false } }), gifScene)
+	await page.waitForFunction("window.waitDrawn()")
+	for (let i = 0; i < 6; i++) await grab()      // finished-word poster / lead-in
+
+	console.log("Sew-in GIF (animation)…")
+	await page.evaluate((o) => window.mount({ ...o, options: { ...o.options, animate: true } }), gifScene)
+	for (let i = 0; i < 42; i++) { await grab(); await page.waitForTimeout(55) }   // empty → sewn
+	for (let i = 0; i < 12; i++) await grab()      // hold on the finished piece
 
 	await browser.close()
 	server.close()
