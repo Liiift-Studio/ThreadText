@@ -7,9 +7,11 @@ import { useEffect, useRef, useState, useCallback, useDeferredValue } from "reac
 import { createThreadText } from "@liiift-studio/threadtext"
 import type { ThreadTextInstance } from "@liiift-studio/threadtext"
 
-/** A spread of type styles (labelled by category, not by name) — each embroiders differently. */
+/** A spread of type styles (labelled by category, not by name) — each embroiders differently.
+ *  `opsz: true` marks the faces that ship an optical-size axis, so the Optical control is only
+ *  shown when it actually does something (see fontHasOpsz). */
 const FONTS = [
-	{ label: "Display serif", value: '"Fraunces", Georgia, serif' },
+	{ label: "Display serif", value: '"Fraunces", Georgia, serif', opsz: true },
 	{ label: "Text serif", value: 'Merriweather, Georgia, serif' },
 	{ label: "Sans-serif", value: 'ui-sans-serif, system-ui, "Helvetica Neue", Arial, sans-serif' },
 	{ label: "Monospace", value: 'ui-monospace, Menlo, Consolas, "Courier New", monospace' },
@@ -53,12 +55,19 @@ export default function Demo() {
 	const [fill, setFill] = useState(0.9)
 	const [sewRate, setSewRate] = useState(140)
 	const [threadColor, setThreadColor] = useState("#fdf3df")
+	const [colorMode, setColorMode] = useState<'solid' | 'twotone' | 'gradient'>('solid')
+	const [threadColor2, setThreadColor2] = useState("#c0532f")
+	const [backstitch, setBackstitch] = useState(false)
+	const [outlineColor, setOutlineColor] = useState("#3a2410")
 	const [sheen, setSheen] = useState(true)
 	const [sewStyle, setSewStyle] = useState<'machine' | 'hand'>('machine')
 	const [stitchMode, setStitchMode] = useState<'satin' | 'cross' | 'chain' | 'running'>('satin')
 	const [opsz, setOpsz] = useState(40)
 
-	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, sheen, sewStyle, stitchMode, axes: { opsz } })
+	// Only surface the Optical control on faces that ship an opsz axis (else it's a no-op).
+	const fontHasOpsz = FONTS.find(f => f.value === font)?.opsz ?? false
+
+	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, colorMode, threadColor2, backstitch, outlineColor, sheen, sewStyle, stitchMode, axes: { opsz } })
 
 	// Create once; everything below is applied live.
 	useEffect(() => {
@@ -98,8 +107,8 @@ export default function Demo() {
 
 	// Live parameter changes — instant redraw, no re-sew.
 	useEffect(() => {
-		instRef.current?.update({ font, weight: dWeight, fill: dFill, sewRate, threadColor, sheen, sewStyle, stitchMode, axes: { opsz: dOpsz } })
-	}, [font, dWeight, dFill, sewRate, threadColor, sheen, sewStyle, stitchMode, dOpsz])
+		instRef.current?.update({ font, weight: dWeight, fill: dFill, sewRate, threadColor, colorMode, threadColor2, backstitch, outlineColor, sheen, sewStyle, stitchMode, axes: { opsz: dOpsz } })
+	}, [font, dWeight, dFill, sewRate, threadColor, colorMode, threadColor2, backstitch, outlineColor, sheen, sewStyle, stitchMode, dOpsz])
 
 	// Text changes (input or canvas typing).
 	useEffect(() => { instRef.current?.setText(text) }, [text])
@@ -164,7 +173,7 @@ export default function Demo() {
 			<div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
 				<Slider label="Size" value={fill} min={0.4} max={1} step={0.02} fmt={v => `${Math.round(v * 100)}%`} onChange={setFill} title="Fraction of the width the word fills — refits to the container on resize" />
 				<Slider label="Weight" value={weight} min={200} max={900} step={10} onChange={setWeight} title="Numeric font weight — heavier strokes give broader satin bands" />
-				<Slider label="Optical" value={opsz} min={9} max={144} step={1} onChange={setOpsz} title="Variable-font optical size (opsz axis) — visible on fonts that have it, e.g. the display serif" />
+				{fontHasOpsz && <Slider label="Optical" value={opsz} min={9} max={144} step={1} onChange={setOpsz} title="Variable-font optical size (opsz axis) — this face has one; switch fonts and it hides where it does nothing" />}
 				<Slider label="Sew rate" value={sewRate} min={30} max={320} step={10} fmt={v => `${v}/s`} onChange={setSewRate} title="How fast the sew-in animation lays stitches — hit Replay to watch it" />
 				<div className="flex flex-col gap-1">
 					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Sew style</span>
@@ -200,7 +209,25 @@ export default function Demo() {
 						))}
 					</div>
 				</div>
+				<div className="flex flex-col gap-1">
+					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Colour</span>
+					<div role="group" aria-label="Colour mode" className="flex flex-wrap gap-2">
+						{([['solid', 'Solid'], ['twotone', 'Two-tone'], ['gradient', 'Gradient']] as const).map(([v, lbl]) => (
+							<button
+								key={v}
+								onClick={() => setColorMode(v)}
+								aria-pressed={colorMode === v}
+								title={v === 'solid' ? 'One floss colour' : v === 'twotone' ? 'Two colours as alternating threads side by side' : 'A smooth colour transition across the word'}
+								className="text-xs px-3 py-2 rounded-full border transition-opacity"
+								style={{ borderColor: 'currentColor', opacity: colorMode === v ? 1 : 0.5, background: colorMode === v ? 'var(--btn-bg)' : 'transparent' }}
+							>
+								{lbl}
+							</button>
+						))}
+					</div>
+				</div>
 				<Toggle label="Sheen" on={sheen} onClick={() => setSheen(v => !v)} title="Cursor-following highlight that turns the threads over in the light" />
+				<Toggle label="Backstitch" on={backstitch} onClick={() => setBackstitch(v => !v)} title="A darker running-stitch outline traced around each glyph — sews in last" />
 				<label className="flex flex-col gap-1">
 					<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Thread</span>
 					<span className="flex items-center gap-2">
@@ -208,6 +235,24 @@ export default function Demo() {
 						<span className="tabular-nums text-xs text-muted">{threadColor}</span>
 					</span>
 				</label>
+				{colorMode !== 'solid' && (
+					<label className="flex flex-col gap-1">
+						<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Thread 2</span>
+						<span className="flex items-center gap-2">
+							<input type="color" value={threadColor2} aria-label="Second thread colour" onChange={e => setThreadColor2(e.target.value)} style={{ width: 34, height: 26, border: '1px solid currentColor', borderRadius: 6, background: 'transparent', cursor: 'pointer', padding: 0 }} />
+							<span className="tabular-nums text-xs text-muted">{threadColor2}</span>
+						</span>
+					</label>
+				)}
+				{backstitch && (
+					<label className="flex flex-col gap-1">
+						<span className="text-xs uppercase tracking-[0.18em] font-medium text-muted">Outline</span>
+						<span className="flex items-center gap-2">
+							<input type="color" value={outlineColor} aria-label="Backstitch outline colour" onChange={e => setOutlineColor(e.target.value)} style={{ width: 34, height: 26, border: '1px solid currentColor', borderRadius: 6, background: 'transparent', cursor: 'pointer', padding: 0 }} />
+							<span className="tabular-nums text-xs text-muted">{outlineColor}</span>
+						</span>
+					</label>
+				)}
 			</div>
 
 			<p className="text-xs text-muted italic" style={{ lineHeight: 1.8 }}>

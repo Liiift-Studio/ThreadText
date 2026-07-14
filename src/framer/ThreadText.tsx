@@ -8,7 +8,7 @@
 import { useEffect, useRef } from "react"
 import { addPropertyControls, ControlType, RenderTarget } from "framer"
 // Pin to a published version so shared instances stay stable. Bump when the core changes.
-import { createThreadText } from "https://esm.sh/@liiift-studio/threadtext@0.4.0"
+import { createThreadText } from "https://esm.sh/@liiift-studio/threadtext@0.4.2"
 
 /** Props surfaced to the Framer UI via addPropertyControls.
  *  Option fields are declared explicitly so the component needs no type import over HTTP. */
@@ -21,6 +21,14 @@ interface ThreadTextFramerProps {
 	weight: number
 	/** Floss (thread) colour — the lit crest of each thread. */
 	threadColor: string
+	/** Second floss colour (used by two-tone / gradient colour modes). */
+	threadColor2: string
+	/** How the floss is coloured: one colour, two side-by-side, or a gradient across the word. */
+	colorMode: "solid" | "twotone" | "gradient"
+	/** Add a darker running-stitch backstitch outline around each glyph. */
+	backstitch: boolean
+	/** Backstitch outline colour. */
+	outlineColor: string
 	/** Fraction of the width the word spans (its size). */
 	fill: number
 	/** Sew-in style: 'machine' satin rows, or 'hand' single-thread. */
@@ -49,6 +57,10 @@ export default function ThreadText(props: Partial<ThreadTextFramerProps>) {
 		fontFamily = "Georgia, serif",
 		weight = 680,
 		threadColor = "#fffbf3",
+		threadColor2 = "#c0532f",
+		colorMode = "solid",
+		backstitch = false,
+		outlineColor = "#3a2410",
 		fill = 0.9,
 		sewStyle = "machine",
 		stitchMode = "satin",
@@ -69,13 +81,13 @@ export default function ThreadText(props: Partial<ThreadTextFramerProps>) {
 	useEffect(() => {
 		const el = ref.current
 		if (!el) return
-		const instance = createThreadText(el, { text, font: fontFamily, weight, threadColor, fill, sewStyle, stitchMode, axes: { opsz }, sewRate, sheen: live ? sheen : false, animate: live ? animate : false })
+		const instance = createThreadText(el, { text, font: fontFamily, weight, threadColor, threadColor2, colorMode, backstitch, outlineColor, fill, sewStyle, stitchMode, axes: { opsz }, sewRate, sheen: live ? sheen : false, animate: live ? animate : false })
 		instRef.current = instance
 		return () => instance.destroy()
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [live])
 
-	useEffect(() => { instRef.current?.update({ font: fontFamily, weight, threadColor, fill, sewStyle, stitchMode, axes: { opsz }, sewRate, sheen: live ? sheen : false, animate: live ? animate : false }) }, [fontFamily, weight, threadColor, fill, sewStyle, stitchMode, opsz, sewRate, sheen, animate, live])
+	useEffect(() => { instRef.current?.update({ font: fontFamily, weight, threadColor, threadColor2, colorMode, backstitch, outlineColor, fill, sewStyle, stitchMode, axes: { opsz }, sewRate, sheen: live ? sheen : false, animate: live ? animate : false }) }, [fontFamily, weight, threadColor, threadColor2, colorMode, backstitch, outlineColor, fill, sewStyle, stitchMode, opsz, sewRate, sheen, animate, live])
 	useEffect(() => { instRef.current?.setText(text) }, [text])
 
 	return <div ref={ref} style={{ width: "100%" }} role="img" aria-label={text} />
@@ -86,7 +98,11 @@ addPropertyControls(ThreadText, {
 	text: { type: ControlType.String, title: "Text", defaultValue: "Thread", displayTextArea: false },
 	fontFamily: { type: ControlType.String, title: "Font", defaultValue: "Georgia, serif", description: "A loaded font family. The glyph geometry drives the stitch flow." },
 	weight: { type: ControlType.Number, title: "Weight", defaultValue: 680, min: 100, max: 900, step: 10 },
+	colorMode: { type: ControlType.Enum, title: "Colour", options: ["solid", "twotone", "gradient"], optionTitles: ["Solid", "Two-tone", "Gradient"], defaultValue: "solid" },
 	threadColor: { type: ControlType.Color, title: "Thread", defaultValue: "#fffbf3" },
+	threadColor2: { type: ControlType.Color, title: "Thread 2", defaultValue: "#c0532f", hidden: (p) => p.colorMode === "solid" },
+	backstitch: { type: ControlType.Boolean, title: "Backstitch", defaultValue: false },
+	outlineColor: { type: ControlType.Color, title: "Outline", defaultValue: "#3a2410", hidden: (p) => !p.backstitch },
 	fill: { type: ControlType.Number, title: "Size", defaultValue: 0.9, min: 0.3, max: 1, step: 0.02, description: "Fraction of the width the word fills." },
 	sewStyle: { type: ControlType.Enum, title: "Sew style", options: ["machine", "hand"], optionTitles: ["Machine", "Hand"], defaultValue: "machine" },
 	stitchMode: { type: ControlType.Enum, title: "Stitch", options: ["satin", "cross", "chain", "running"], optionTitles: ["Satin", "Cross", "Chain", "Running"], defaultValue: "satin" },

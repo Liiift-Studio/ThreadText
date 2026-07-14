@@ -27,6 +27,10 @@ const INSTANCES = new WeakMap<HTMLElement, Instance>()
  *   data-tt-font          — CSS font-family of a loaded font
  *   data-tt-weight        — numeric font weight (100–900)
  *   data-tt-thread-color  — floss colour (hex or rgb())
+ *   data-tt-thread-color2 — second floss colour (for two-tone / gradient)
+ *   data-tt-color-mode    — "solid" | "twotone" | "gradient" (default "solid")
+ *   data-tt-backstitch    — "true" to add a running-stitch outline around each glyph
+ *   data-tt-outline-color — backstitch outline colour
  *   data-tt-pitch         — thread spacing in px
  *   data-tt-fill          — fraction of the width the word fills (its size)
  *   data-tt-sew-style     — "hand" for a single-thread hand look (default "machine")
@@ -47,6 +51,10 @@ function readOptions(el: HTMLElement, fallbackText: string): ThreadTextOptions {
 	if (d.ttFont) opts.font = d.ttFont
 	if (d.ttWeight !== undefined) { const n = parseFloat(d.ttWeight); if (!isNaN(n)) opts.weight = n }
 	if (d.ttThreadColor) opts.threadColor = d.ttThreadColor
+	if (d.ttThreadColor2) opts.threadColor2 = d.ttThreadColor2
+	if (d.ttColorMode && ['solid', 'twotone', 'gradient'].includes(d.ttColorMode)) opts.colorMode = d.ttColorMode as ThreadTextOptions['colorMode']
+	if (d.ttBackstitch === 'true') opts.backstitch = true
+	if (d.ttOutlineColor) opts.outlineColor = d.ttOutlineColor
 	if (d.ttPitch !== undefined) { const n = parseFloat(d.ttPitch); if (!isNaN(n)) opts.pitch = n }
 	if (d.ttFill !== undefined) { const n = parseFloat(d.ttFill); if (!isNaN(n)) opts.fill = n }
 	if (d.ttSewStyle === 'hand') opts.sewStyle = 'hand'

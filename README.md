@@ -6,7 +6,7 @@
 [![license](https://img.shields.io/npm/l/@liiift-studio/threadtext.svg)](./LICENSE)
 ![types](https://img.shields.io/badge/types-included-blue.svg)
 ![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
-![gzip](https://img.shields.io/badge/gzip-~9%20kB-brightgreen.svg)
+![gzip](https://img.shields.io/badge/gzip-~10%20kB-brightgreen.svg)
 
 Homepage: **[threadtext.com](https://threadtext.com)** (live, interactive demo) · npm: [`@liiift-studio/threadtext`](https://www.npmjs.com/package/@liiift-studio/threadtext)
 
@@ -109,7 +109,7 @@ function Stitched() {
      data-tt-sew-style="machine"></div>
 ```
 
-The bundle auto-initialises every `[data-threadtext]` element and exposes a small `window.ThreadText` API for manual control. Supported attributes: `data-tt-text`, `data-tt-font`, `data-tt-weight`, `data-tt-thread-color`, `data-tt-fill`, `data-tt-pitch`, `data-tt-stitch-mode`, `data-tt-sew-style`, `data-tt-sew-rate`, `data-tt-sheen`, `data-tt-animate`, `data-tt-editable`, `data-tt-axes` (JSON).
+The bundle auto-initialises every `[data-threadtext]` element and exposes a small `window.ThreadText` API for manual control. Supported attributes: `data-tt-text`, `data-tt-font`, `data-tt-weight`, `data-tt-thread-color`, `data-tt-thread-color2`, `data-tt-color-mode`, `data-tt-backstitch`, `data-tt-outline-color`, `data-tt-fill`, `data-tt-pitch`, `data-tt-stitch-mode`, `data-tt-sew-style`, `data-tt-sew-rate`, `data-tt-sheen`, `data-tt-animate`, `data-tt-editable`, `data-tt-axes` (JSON).
 
 ---
 
@@ -122,6 +122,8 @@ All fields on `ThreadTextOptions`. Most can be changed live with `instance.updat
 - **`weight`** — numeric font weight (drives the `wght` axis via the standard font shorthand).
 - **`axes`** — variable-font axes, e.g. `{ opsz: 40, SOFT: 60 }`, applied via canvas `fontVariationSettings` (Chrome/Edge/Safari); ignored where unsupported.
 - **`threadColor`** — floss colour.
+- **`colorMode`** — `'solid'` (default) · `'twotone'` (two colours as alternating threads packed side by side) · `'gradient'` (a smooth colour transition across the word). `'twotone'`/`'gradient'` use **`threadColor2`** as the second colour.
+- **`backstitch`** — add a darker running-stitch **outline** traced around each glyph (sews in last); **`outlineColor`** sets its colour (defaults to a darkened `threadColor`).
 - **`fill`** — size: the fraction of the container width the word spans (it re-fits on load/resize).
 - **`pitch`** — thread spacing (how tightly the stitches are packed across each stroke).
 - **`stitchMode`** — `'satin'` · `'cross'` · `'chain'` · `'running'` textures (below).
@@ -137,6 +139,12 @@ All fields on `ThreadTextOptions`. Most can be changed live with `instance.updat
   <em>The four <code>stitchMode</code> textures.</em>
 </p>
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Liiift-Studio/ThreadText/main/assets/thread-styles.png?v=1" alt="The word &ldquo;Sew&rdquo; in four floss styles: solid, two-tone, gradient, and with a backstitch outline" width="820" />
+  <br />
+  <em>Floss styles: <code>colorMode</code> (solid / two-tone / gradient) and the <code>backstitch</code> outline.</em>
+</p>
+
 ---
 
 ## Requirements & browser support
@@ -145,7 +153,7 @@ All fields on `ThreadTextOptions`. Most can be changed live with `instance.updat
 - **Web Worker + `Blob` + `URL.createObjectURL`** — used to run the geometry pass off the main thread. **Under a strict Content-Security-Policy the Worker is built from a `blob:` URL**, so you need `worker-src blob:` (or `script-src blob:`). If Worker creation is blocked or unavailable, threadText **degrades gracefully** and runs the same pass synchronously on the main thread — correct output, but heavy edits can jank on very large words.
 - **`fontVariationSettings` on canvas** (Chrome/Edge/Safari) — needed only for the `axes` option; feature-detected and skipped where unsupported.
 - **`prefers-reduced-motion`** — honoured automatically (skips the sew-in animation).
-- **Size** — ~9 kB gzipped (ESM), ~8 kB for the standalone Webflow bundle. **Zero runtime dependencies** (`react`/`react-dom` are optional peers), tree-shakeable (`sideEffects: false`).
+- **Size** — ~10 kB gzipped (ESM), ~9 kB for the standalone Webflow bundle. **Zero runtime dependencies** (`react`/`react-dom` are optional peers), tree-shakeable (`sideEffects: false`).
 - **Stability** — pre-1.0 (`0.x`); the option and instance API above is what's shipped, but pin the version if you depend on exact visual output.
 
 ---

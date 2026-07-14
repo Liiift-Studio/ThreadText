@@ -188,6 +188,25 @@ describe('createThreadText', () => {
 		expect(() => inst!.update({ stitchMode: 'chain' })).not.toThrow()
 	})
 
+	it('all colour modes build and update live without throwing', () => {
+		for (const colorMode of ['solid', 'twotone', 'gradient'] as const) {
+			const i = createThreadText(host, { text: 'Hue', colorMode, threadColor: '#e7c56a', threadColor2: '#c0532f' })
+			expect(host.querySelectorAll('canvas').length).toBeGreaterThanOrEqual(2)
+			i.destroy()
+		}
+		inst = createThreadText(host, { text: 'Hue', threadColor: '#e7c56a' })
+		expect(() => inst!.update({ colorMode: 'twotone', threadColor2: '#c0532f' })).not.toThrow()
+		expect(() => inst!.update({ colorMode: 'gradient' })).not.toThrow()
+		expect(() => inst!.update({ colorMode: 'solid' })).not.toThrow()
+	})
+
+	it('backstitch outline builds and toggles live without throwing', () => {
+		inst = createThreadText(host, { text: 'Edge', backstitch: true, outlineColor: '#3a2410' })
+		expect(host.querySelectorAll('canvas').length).toBeGreaterThanOrEqual(2)
+		expect(() => inst!.update({ backstitch: false })).not.toThrow()
+		expect(() => inst!.update({ backstitch: true })).not.toThrow()
+	})
+
 	it('reduced-motion draws instantly and still renders', () => {
 		inst = createThreadText(host, { text: 'Calm', reducedMotion: true })
 		expect(host.querySelectorAll('canvas').length).toBe(2)

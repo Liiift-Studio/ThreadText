@@ -91,7 +91,22 @@ async function main() {
 	await page.waitForFunction("window.waitDrawn()")
 	await shot("stitch-modes.png")
 
-	// 3) Sew-in GIF — the signature animation, captured frame by frame.
+	// 3) Thread styles — solid / two-tone / gradient / backstitch, labelled.
+	console.log("Thread styles…")
+	await page.evaluate((o) => window.mount(o), {
+		layout: "grid",
+		common: { font: '"Fraunces", Georgia, serif', animate: false, sheen: false, fill: 0.82, weight: 640, threadColor: "#e7c56a" },
+		cells: [
+			{ caption: "solid", options: { text: "Sew" } },
+			{ caption: "two-tone", options: { text: "Sew", colorMode: "twotone", threadColor2: "#c0532f" } },
+			{ caption: "gradient", options: { text: "Sew", colorMode: "gradient", threadColor2: "#7a1f8c" } },
+			{ caption: "backstitch", options: { text: "Sew", backstitch: true, outlineColor: "#3a2410" } },
+		],
+	})
+	await page.waitForFunction("window.waitDrawn()")
+	await shot("thread-styles.png")
+
+	// 4) Sew-in GIF — the signature animation, captured frame by frame.
 	// The GIF must survive its own FIRST frame (GitHub/npm often show the poster, not motion),
 	// so we lead with a few frames of the FINISHED word, then play the sew-in, then hold on the
 	// finished piece. Poster = a recognisable embroidered word, not an empty canvas.

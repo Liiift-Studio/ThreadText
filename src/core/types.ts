@@ -26,6 +26,26 @@ export interface ThreadTextOptions {
 	/** Floss (thread) colour — the lit crest of each thread. (default: warm white '#fffbf3') */
 	threadColor?: string
 	/**
+	 * Second floss colour, used by `colorMode: 'twotone'` and `'gradient'`. Ignored when
+	 * `colorMode` is `'solid'` (the default). (default: falls back to `threadColor`)
+	 */
+	threadColor2?: string
+	/**
+	 * How the floss is coloured:
+	 * - **'solid'** (default) — one colour (`threadColor`).
+	 * - **'twotone'** — two colours (`threadColor` + `threadColor2`) laid as alternating threads
+	 *   packed side by side across each stroke.
+	 * - **'gradient'** — a smooth colour transition from `threadColor` to `threadColor2` across the word.
+	 */
+	colorMode?: 'solid' | 'twotone' | 'gradient'
+	/**
+	 * Add a darker running-stitch **backstitch outline** traced around each glyph — the way a piece is
+	 * often finished by hand. Sews in last. (default: false)
+	 */
+	backstitch?: boolean
+	/** Backstitch outline colour. (default: a darkened shade of `threadColor`) */
+	outlineColor?: string
+	/**
 	 * Thread spacing in internal pixels. Smaller = finer, denser stitching (and more work).
 	 * (default: auto — derived from the fitted text height)
 	 */

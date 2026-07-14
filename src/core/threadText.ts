@@ -159,7 +159,7 @@ function computeGeometry(alpha: Uint8ClampedArray, W: number, H: number): { mask
 }
 
 // A single laid stitch: position, thread angle, and pre-shaded sprite brightness bucket.
-interface Stitch { x: number; y: number; ang: number; idx: number }
+interface Stitch { x: number; y: number; ang: number; idx: number; pal?: number; outline?: 1 }
 
 // ─── The instance factory ────────────────────────────────────────────────────────
 
@@ -190,6 +190,13 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let animate = opts.animate ?? true
 	let editable = opts.editable ?? false
 	let pitchOpt = opts.pitch
+	const COLOR_MODES = ['solid', 'twotone', 'gradient'] as const
+	type ColorMode = typeof COLOR_MODES[number]
+	let colorMode: ColorMode = (COLOR_MODES as readonly string[]).includes(opts.colorMode ?? '') ? (opts.colorMode as ColorMode) : 'solid'
+	let threadColor1 = opts.threadColor ?? '#fffbf3'
+	let threadColor2 = opts.threadColor2 ?? threadColor1
+	let backstitch = opts.backstitch ?? false
+	let outlineColorOpt = opts.outlineColor
 	let axes = opts.axes
 	let onTextChange = opts.onTextChange
 	let primaryFamily = primaryOf(font)
@@ -209,16 +216,32 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	const REDUCED = opts.reducedMotion ??
 		!!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
 
-	// Thread colour ramp (lit crest → mid → soft ends), derived from threadColor.
-	let threadPeak = parseColor(opts.threadColor ?? '#fffbf3', [255, 251, 243])
-	let threadMid: [number, number, number] = [0, 0, 0]
-	let threadEnd: [number, number, number] = [0, 0, 0]
-	function setThreadRamp(color: string): void {
-		threadPeak = parseColor(color, [255, 251, 243])
-		threadMid = [threadPeak[0] * 0.585, threadPeak[1] * 0.585, threadPeak[2] * 0.585]
-		threadEnd = [threadPeak[0] * 0.47, threadPeak[1] * 0.47, threadPeak[2] * 0.47]
+	// Thread colour ramps. Each floss colour becomes a ramp (lit crest → mid → soft ends). A
+	// palette holds one ramp for 'solid', two for 'twotone', or N interpolated stops for 'gradient';
+	// each stitch picks a palette entry (see buildStitchList). `threadPeak` mirrors the first entry
+	// for the caret/sheen tint.
+	type Ramp = { peak: [number, number, number]; mid: [number, number, number]; end: [number, number, number] }
+	const rampOf = (c: [number, number, number]): Ramp => ({
+		peak: c,
+		mid: [c[0] * 0.585, c[1] * 0.585, c[2] * 0.585],
+		end: [c[0] * 0.47, c[1] * 0.47, c[2] * 0.47],
+	})
+	const lerp3 = (a: [number, number, number], b: [number, number, number], t: number): [number, number, number] =>
+		[a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+	const GRADIENT_STOPS = 6                      // gradient quantised into this many pre-shaded ramps
+	let threadPeak: [number, number, number] = [255, 251, 243]
+	let PALETTE: Ramp[] = []
+	let outlineRamp: Ramp = rampOf([0, 0, 0])
+	function buildPalette(): void {
+		const c1 = parseColor(threadColor1, [255, 251, 243])
+		const c2 = parseColor(threadColor2, c1)
+		if (colorMode === 'twotone') PALETTE = [rampOf(c1), rampOf(c2)]
+		else if (colorMode === 'gradient') { PALETTE = []; for (let k = 0; k < GRADIENT_STOPS; k++) PALETTE.push(rampOf(lerp3(c1, c2, k / (GRADIENT_STOPS - 1)))) }
+		else PALETTE = [rampOf(c1)]
+		threadPeak = PALETTE[0].peak
+		outlineRamp = rampOf(outlineColorOpt ? parseColor(outlineColorOpt, [0, 0, 0]) : [c1[0] * 0.32, c1[1] * 0.32, c1[2] * 0.32])
 	}
-	setThreadRamp(opts.threadColor ?? '#fffbf3')
+	buildPalette()
 
 	// ── target canvases ──
 	const created: HTMLElement[] = []
@@ -252,7 +275,8 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let W = 0, H = 0
 	let FS = 0, ANCHOR_X = 0
 	let PITCH = 4
-	let SPRITES: HTMLCanvasElement[] = [], SPRITE_W = 0, SPRITE_H = 0
+	let SPRITES: HTMLCanvasElement[] = [], SPRITE_W = 0, SPRITE_H = 0   // flat: palette entry p, brightness k → SPRITES[p * 20 + k]
+	let OUTLINE_SPRITES: HTMLCanvasElement[] = []                        // backstitch dashes, 20 brightness variants
 	let spriteAngOffset = 0                       // extra rotation per stitch mode (along vs across stroke)
 	let spritePitch = -1, spriteColorKey = ''   // cache keys so sprites rebuild only when needed
 	let allocW = -1, allocH = -1                // OFFCV realloc only when size changes
@@ -262,7 +286,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let MASKCV: HTMLCanvasElement | null = null
 	let OFFCV: HTMLCanvasElement | null = null
 	let OFFCTX: CanvasRenderingContext2D | null = null
-	let STITCHES: Stitch[] = [], STEP_G = 3
+	let STITCHES: Stitch[] = [], OUTLINE: Stitch[] = [], STEP_G = 3
 
 	const anim = { rows: [] as Stitch[][], idx: 0, acc: 0, rate: 0, on: false }
 	const sheen = { x: 0, y: 0, set: false }
@@ -324,34 +348,32 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		allocW = W; allocH = H
 	}
 
-	/** Cache key: sprites depend on pitch, thread colour, and stitch mode. */
-	function spriteKey(): string { return threadPeak.join(',') + '|' + stitchMode }
-	// ── thread sprite (pre-shaded), in 20 brightness variants, per stitch mode ──
-	function buildSprites(): void {
+	/** Cache key: sprites depend on pitch, the whole palette, stitch mode, and the backstitch outline. */
+	function spriteKey(): string {
+		return PALETTE.map((r) => r.peak.join(',')).join(';') + '|' + stitchMode + '|' + colorMode +
+			(backstitch ? '|bs' + outlineRamp.peak.join(',') : '')
+	}
+	// ── one 20-brightness sprite set for a single ramp, in the current stitch mode ──
+	function makeSpriteSet(ramp: Ramp, mode: StitchMode): HTMLCanvasElement[] {
 		const L = Math.max(7, PITCH * 2.5)     // thread length
 		const Wd = Math.max(3.2, PITCH * 1.3)  // thread width
-		// square sprite for X / loop textures; long-thin for satin / running
-		if (stitchMode === 'cross' || stitchMode === 'chain') { SPRITE_W = SPRITE_H = Math.ceil(L) + 2 }
-		else { SPRITE_W = Math.ceil(L) + 2; SPRITE_H = Math.ceil(Wd) + 2 }
-		// chain / running run ALONG the stroke; satin / cross across it
-		spriteAngOffset = (stitchMode === 'chain' || stitchMode === 'running') ? Math.PI / 2 : 0
-		SPRITES = []
+		const set: HTMLCanvasElement[] = []
 		for (let k = 0; k < 20; k++) {
 			const b = 0.34 + (k / 19) * 0.82           // brightness level (20 buckets → less banding)
 			const cv = document.createElement('canvas'); cv.width = SPRITE_W; cv.height = SPRITE_H
 			const c = cv.getContext('2d')
-			if (!c) { SPRITES.push(cv); continue }
+			if (!c) { set.push(cv); continue }
 			const cx = SPRITE_W / 2, cy = SPRITE_H / 2
 			const col = (base: [number, number, number], a: number) => `rgba(${byte(base[0] * b)},${byte(base[1] * b)},${byte(base[2] * b)},${a})`
 			// A shaded rounded floss "tube" of `len`×`wid`, rotated `ang`, centred in the sprite.
 			const tube = (len: number, wid: number, ang: number, endFade: boolean) => {
 				c.save(); c.translate(cx, cy); c.rotate(ang)
 				const g = c.createLinearGradient(0, -wid / 2, 0, wid / 2)
-				g.addColorStop(0.00, col(threadEnd, 0))
-				g.addColorStop(0.16, col(threadMid, 1))
-				g.addColorStop(0.50, col(threadPeak, 1))
-				g.addColorStop(0.84, col(threadMid, 1))
-				g.addColorStop(1.00, col(threadEnd, 0))
+				g.addColorStop(0.00, col(ramp.end, 0))
+				g.addColorStop(0.16, col(ramp.mid, 1))
+				g.addColorStop(0.50, col(ramp.peak, 1))
+				g.addColorStop(0.84, col(ramp.mid, 1))
+				g.addColorStop(1.00, col(ramp.end, 0))
 				c.fillStyle = g
 				const r = wid / 2
 				c.beginPath()
@@ -371,26 +393,42 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 				}
 				c.restore()
 			}
-			if (stitchMode === 'cross') {
+			if (mode === 'cross') {
 				tube(L * 0.92, Wd * 0.82, Math.PI / 4, false)     // an X
 				tube(L * 0.92, Wd * 0.82, -Math.PI / 4, false)
-			} else if (stitchMode === 'chain') {
+			} else if (mode === 'chain') {
 				c.save(); c.translate(cx, cy)                     // a looped link
 				const g = c.createLinearGradient(0, -Wd, 0, Wd)
-				g.addColorStop(0, col(threadMid, 1)); g.addColorStop(0.5, col(threadPeak, 1)); g.addColorStop(1, col(threadMid, 1))
+				g.addColorStop(0, col(ramp.mid, 1)); g.addColorStop(0.5, col(ramp.peak, 1)); g.addColorStop(1, col(ramp.mid, 1))
 				c.strokeStyle = g; c.lineWidth = Math.max(1.6, Wd * 0.7); c.lineCap = 'round'
 				c.beginPath(); c.ellipse(0, 0, L * 0.34, Wd * 1.05, 0, 0, Math.PI * 2); c.stroke()
 				c.restore()
-			} else if (stitchMode === 'running') {
+			} else if (mode === 'running') {
 				tube(L * 0.5, Wd, 0, false)                       // a short dash
 			} else {
 				tube(L, Wd, 0, true)                              // satin (default)
 			}
-			SPRITES.push(cv)
+			set.push(cv)
 		}
+		return set
+	}
+	// ── build the full sprite bank: one set per palette entry, plus the backstitch dashes ──
+	function buildSprites(): void {
+		const L = Math.max(7, PITCH * 2.5)
+		const Wd = Math.max(3.2, PITCH * 1.3)
+		// square sprite for X / loop textures; long-thin for satin / running
+		if (stitchMode === 'cross' || stitchMode === 'chain') { SPRITE_W = SPRITE_H = Math.ceil(L) + 2 }
+		else { SPRITE_W = Math.ceil(L) + 2; SPRITE_H = Math.ceil(Wd) + 2 }
+		// chain / running run ALONG the stroke; satin / cross across it
+		spriteAngOffset = (stitchMode === 'chain' || stitchMode === 'running') ? Math.PI / 2 : 0
+		SPRITES = []
+		for (const ramp of PALETTE) for (const cv of makeSpriteSet(ramp, stitchMode)) SPRITES.push(cv)
+		// Backstitch: a darker running dash (rendered on the same sprite canvas, drawn without the
+		// mode's angle offset — its long axis follows the boundary tangent, see drawStitch).
+		OUTLINE_SPRITES = backstitch ? makeSpriteSet(outlineRamp, 'running') : []
 		spritePitch = PITCH; spriteColorKey = spriteKey()
 	}
-	/** Rebuild the sprite sheet only if the pitch, thread colour, or stitch mode changed. */
+	/** Rebuild the sprite sheet only if the pitch, palette/mode, or backstitch changed. */
 	function ensureSprites(): void {
 		if (SPRITES.length && spritePitch === PITCH && spriteColorKey === spriteKey()) return
 		buildSprites()
@@ -432,6 +470,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	function buildStitchList(): void {
 		const STEP = Math.max(1.6, PITCH * 0.6); STEP_G = STEP
 		const list: Stitch[] = []
+		let minX = Infinity, maxX = -Infinity
 		for (let y = 0; y < H; y += STEP) for (let x = 0; x < W; x += STEP) {
 			const jx = (hash2(Math.floor(x), Math.floor(y)) - 0.5) * STEP * 0.9
 			const jy = (hash2(Math.floor(y), Math.floor(x)) - 0.5) * STEP * 0.9
@@ -442,14 +481,53 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			const jit = 0.86 + hash2(px * 7, py * 13) * 0.18
 			let b = SHADE[i] * jit; b = b < 0 ? 0 : b > 1.12 ? 1.12 : b
 			list.push({ x: px, y: py, ang, idx: Math.min(19, Math.max(0, Math.round((b / 1.12) * 19))) })
+			if (px < minX) minX = px; if (px > maxX) maxX = px
+		}
+		// Assign a palette entry per stitch. twotone: alternate colours in bands running across each
+		// stroke (perpendicular to the thread) → two threads packed side by side. gradient: quantise
+		// the word's horizontal position to the interpolated stops. solid: entry 0.
+		if (colorMode === 'twotone') {
+			const bandW = Math.max(4, PITCH * 1.6)
+			for (const s of list) { const proj = -Math.sin(s.ang) * s.x + Math.cos(s.ang) * s.y; s.pal = (Math.floor(proj / bandW) & 1) }
+		} else if (colorMode === 'gradient') {
+			const span = Math.max(1, maxX - minX)
+			for (const s of list) s.pal = Math.min(GRADIENT_STOPS - 1, Math.max(0, Math.round(((s.x - minX) / span) * (GRADIENT_STOPS - 1))))
 		}
 		STITCHES = list
+		buildOutlineList()
+	}
+
+	// ── backstitch: darker running dashes along the glyph boundary, evenly subsampled ──
+	function buildOutlineList(): void {
+		OUTLINE = []
+		if (!backstitch || !MASK.length) return
+		const spacing = Math.max(3, PITCH * 1.5)
+		const gw = Math.max(1, Math.ceil(W / spacing))
+		const taken = new Set<number>()
+		const m = (xx: number, yy: number) => (MASK[yy * W + xx] ? 1 : 0)
+		for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+			const i = y * W + x
+			if (!MASK[i]) continue
+			if (MASK[i - 1] && MASK[i + 1] && MASK[i - W] && MASK[i + W]) continue   // interior pixel — skip
+			const cell = Math.floor(y / spacing) * gw + Math.floor(x / spacing)
+			if (taken.has(cell)) continue
+			taken.add(cell)
+			// Sobel on the mask → outward gradient; the boundary tangent is perpendicular to it.
+			const gx = (m(x + 1, y - 1) + 2 * m(x + 1, y) + m(x + 1, y + 1)) - (m(x - 1, y - 1) + 2 * m(x - 1, y) + m(x - 1, y + 1))
+			const gy = (m(x - 1, y + 1) + 2 * m(x, y + 1) + m(x + 1, y + 1)) - (m(x - 1, y - 1) + 2 * m(x, y - 1) + m(x + 1, y - 1))
+			const tang = Math.atan2(gx, -gy)
+			let b = SHADE[i]; b = b < 0 ? 0 : b > 1.12 ? 1.12 : b
+			OUTLINE.push({ x, y, ang: tang, idx: Math.min(19, Math.max(8, Math.round((b / 1.12) * 19))), outline: 1 })
+		}
 	}
 
 	function drawStitch(c: CanvasRenderingContext2D, s: Stitch): void {
-		c.save(); c.translate(s.x, s.y); c.rotate(s.ang + spriteAngOffset); c.drawImage(SPRITES[s.idx], -SPRITE_W / 2, -SPRITE_H / 2); c.restore()
+		c.save(); c.translate(s.x, s.y)
+		if (s.outline) { c.rotate(s.ang); c.drawImage(OUTLINE_SPRITES[s.idx], -SPRITE_W / 2, -SPRITE_H / 2) }
+		else { c.rotate(s.ang + spriteAngOffset); c.drawImage(SPRITES[(s.pal || 0) * 20 + s.idx], -SPRITE_W / 2, -SPRITE_H / 2) }
+		c.restore()
 	}
-	function drawAll(): void { const c = bgC.getContext('2d'); if (!c) return; for (const s of STITCHES) drawStitch(c, s) }
+	function drawAll(): void { const c = bgC.getContext('2d'); if (!c) return; for (const s of STITCHES) drawStitch(c, s); for (const s of OUTLINE) drawStitch(c, s) }
 	/** Clear the base canvas to transparent (no fabric, no contact shadow). */
 	function resetBg(): void {
 		const c = bgC.getContext('2d'); if (!c) return
@@ -540,7 +618,13 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	function startReveal(): void {
 		resetBg()
 		if (REDUCED || !animate) { drawAll(); anim.on = false; return }
-		anim.rows = sewStyle === 'hand' ? buildHandOrder(STITCHES) : buildSewRows(STITCHES)
+		const rows = sewStyle === 'hand' ? buildHandOrder(STITCHES) : buildSewRows(STITCHES)
+		// Backstitch is a finishing pass — sew it in last, in a handful of chunks along the boundary.
+		if (OUTLINE.length) {
+			const chunks = 24, per = Math.ceil(OUTLINE.length / chunks)
+			for (let i = 0; i < OUTLINE.length; i += per) rows.push(OUTLINE.slice(i, i + per))
+		}
+		anim.rows = rows
 		anim.idx = 0; anim.acc = 0
 		anim.rate = sewRate
 		anim.on = anim.rows.length > 0
@@ -802,13 +886,17 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		update(partial: Partial<ThreadTextOptions>): void {
 			if (destroyed) return
 			if (partial.text !== undefined) { api.setText(partial.text); }   // text is not a live "instant" field — route it
-			let geom = false, spritesOnly = false
+			let geom = false, spritesOnly = false, restitch = false, recolor = false
 			if (partial.font !== undefined && partial.font !== font) { font = partial.font; primaryFamily = primaryOf(font); geom = true }
 			if (partial.weight !== undefined) { const w = clamp(partial.weight, 1, 1000); if (w !== weight) { weight = w; geom = true } }
 			if (partial.fill !== undefined) { const f = clamp(partial.fill, 0.05, 1); if (f !== fill) { fill = f; geom = true } }
 			if (partial.pitch !== undefined && partial.pitch !== pitchOpt) { pitchOpt = partial.pitch; geom = true }
 			if (partial.axes !== undefined) { axes = partial.axes; geom = true }
-			if (partial.threadColor !== undefined) { setThreadRamp(partial.threadColor); spritesOnly = true }
+			if (partial.threadColor !== undefined && partial.threadColor !== threadColor1) { threadColor1 = partial.threadColor; recolor = true }
+			if (partial.threadColor2 !== undefined && partial.threadColor2 !== threadColor2) { threadColor2 = partial.threadColor2; recolor = true }
+			if (partial.outlineColor !== undefined && partial.outlineColor !== outlineColorOpt) { outlineColorOpt = partial.outlineColor; recolor = true }
+			if (partial.colorMode !== undefined && partial.colorMode !== colorMode && (COLOR_MODES as readonly string[]).includes(partial.colorMode)) { colorMode = partial.colorMode as ColorMode; recolor = true; restitch = true }
+			if (partial.backstitch !== undefined && partial.backstitch !== backstitch) { backstitch = partial.backstitch; restitch = true }
 			if (partial.stitchMode !== undefined && partial.stitchMode !== stitchMode && (STITCH_MODES as readonly string[]).includes(partial.stitchMode)) { stitchMode = partial.stitchMode as StitchMode; spritesOnly = true }
 			if (partial.sewRate !== undefined) sewRate = Math.max(1, partial.sewRate)
 			if (partial.sewStyle !== undefined) sewStyle = partial.sewStyle === 'hand' ? 'hand' : 'machine'
@@ -816,9 +904,12 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			if (partial.onTextChange !== undefined) onTextChange = partial.onTextChange
 			if (partial.sheen !== undefined) applySheen(partial.sheen)
 			if (partial.editable !== undefined) applyEditable(partial.editable)
+			if (recolor) buildPalette()
 			if (!booted) return
+			// Colour / mode / backstitch changes redraw instantly (no re-sew), matching threadColor.
 			if (geom) whenFontReady(primaryFamily, weight, () => { if (!destroyed) render(false) })
-			else if (spritesOnly) { buildSprites(); resetBg(); drawAll(); updateCaret(); kick() }
+			else if (restitch) { buildSprites(); buildStitchList(); resetBg(); drawAll(); updateCaret(); kick() }
+			else if (spritesOnly || recolor) { buildSprites(); resetBg(); drawAll(); updateCaret(); kick() }
 		},
 		focus(): void { if (!destroyed && editable) editInput?.focus() },
 		destroy(): void {
@@ -836,7 +927,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			container.removeEventListener('pointermove', onPointerMove)
 			container.removeEventListener('pointerleave', onPointerLeave)
 			for (const c of created) c.remove()
-			SPRITES = []; STITCHES = []; anim.rows = []
+			SPRITES = []; OUTLINE_SPRITES = []; STITCHES = []; OUTLINE = []; anim.rows = []
 			MASK = new Uint8Array(0); SHADE = new Float32Array(0)
 			EX = new Float32Array(0); EY = new Float32Array(0)
 			MASKCV = OFFCV = null; OFFCTX = null; caretEl = null; editInput = null
