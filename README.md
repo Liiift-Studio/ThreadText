@@ -12,9 +12,11 @@ Homepage: **[threadtext.com](https://threadtext.com)** (live, interactive demo) 
 
 Framework-agnostic core (`createThreadText`), a React hook + component (`useThreadText` / `<ThreadText>`), and Framer / Webflow ports. Zero required dependencies; `react`/`react-dom` are optional peers.
 
-> **See it move.** The effect is animated (it sews itself in stitch-by-stitch) and cursor-reactive, so a still can't fully show it — the [**live demo at threadtext.com**](https://threadtext.com) is the fastest way to judge it.
->
-> <!-- Visual assets (hero still, sew-in GIF, stitch-mode grid) are added under /assets and embedded here once the repo is public — see "Development". -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Liiift-Studio/ThreadText/main/assets/hero.png?v=1" alt="The word &ldquo;Thread&rdquo; rendered as raised gold satin-stitch embroidery, the floss running across each stroke" width="820" />
+</p>
+
+> **See it move.** It sews itself in stitch-by-stitch and reacts to the cursor, so a still can't fully show it — the [**live demo at threadtext.com**](https://threadtext.com) is the fastest way to judge it.
 
 ---
 
@@ -36,6 +38,12 @@ Each step below is what actually produces the thread look — the plain-language
 6. **Sew it in** one cross-row at a time as an animation, and add a **subtle cursor-driven sheen** as you move over it.
 
 The heavy geometry pass (steps 2–5) runs in a **Web Worker** so typing and live edits stay smooth; where a Worker isn't available it falls back to running synchronously on the main thread (see [Requirements](#requirements--browser-support)).
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Liiift-Studio/ThreadText/main/assets/sew-in.gif?v=1" alt="Animation of the word &ldquo;Sew&rdquo; being stitched in one satin row at a time" width="480" />
+  <br />
+  <em>The sew-in animation (satin, machine style).</em>
+</p>
 
 ## Use it
 
@@ -116,12 +124,18 @@ All fields on `ThreadTextOptions`. Most can be changed live with `instance.updat
 - **`threadColor`** — floss colour.
 - **`fill`** — size: the fraction of the container width the word spans (it re-fits on load/resize).
 - **`pitch`** — thread spacing (how tightly the stitches are packed across each stroke).
-- **`stitchMode`** — `'satin'` · `'cross'` · `'chain'` · `'running'` textures.
+- **`stitchMode`** — `'satin'` · `'cross'` · `'chain'` · `'running'` textures (below).
 - **`sewStyle`** — `'machine'` (satin rows in parallel) or `'hand'` (one letter at a time, widest threads near the top first, thin edges last).
 - **`sewRate`** · **`animate`** — sew-in speed and whether it plays.
 - **`reducedMotion`** — force-skip the sew-in animation and draw the finished piece in one frame (also honoured automatically when the OS `prefers-reduced-motion` is set).
 - **`sheen`** — cursor-following highlight.
 - **`editable`** + **`onTextChange`** — make the surface typeable (backed by a real `<input>`, so touch keyboards and IME work). Call `instance.focus()` to focus it programmatically.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Liiift-Studio/ThreadText/main/assets/stitch-modes.png?v=1" alt="The word &ldquo;Sew&rdquo; in the four stitch modes: satin, cross, chain, and running" width="820" />
+  <br />
+  <em>The four <code>stitchMode</code> textures.</em>
+</p>
 
 ---
 

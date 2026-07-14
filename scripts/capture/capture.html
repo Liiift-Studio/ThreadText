@@ -1,0 +1,127 @@
+<!doctype html>
+<!-- scripts/capture/capture.html — offscreen stage for README captures. Loads the BUILT core
+     (dist/index.js) and exposes window helpers that Playwright drives. Served from the repo
+     root so /dist and /site/public/fonts resolve. Not shipped in the package tarball. -->
+<meta charset="utf-8" />
+<style>
+	/* Transparent page so element screenshots with omitBackground get clean edges. */
+	html, body { margin: 0; background: transparent; }
+	/* A dark "showcase" backdrop reads on both GitHub light and dark themes. */
+	.stage { background: #14100c; display: inline-block; }
+	.pad { padding: 64px 72px; }
+	.host { width: 900px; }
+	.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px 56px; }
+	.cell { display: flex; flex-direction: column; gap: 14px; }
+	.cap { font: 500 22px/1 "Merriweather", Georgia, serif; color: #b9a88f; letter-spacing: .02em; }
+	.cell .host { width: 420px; }
+
+	@font-face {
+		font-family: "Fraunces";
+		src: url("/site/public/fonts/Fraunces.woff2") format("woff2");
+		font-weight: 100 900;
+		font-display: block;
+	}
+	@font-face {
+		font-family: "Merriweather";
+		src: url("/site/public/fonts/Merriweather.woff2") format("woff2");
+		font-weight: 300 900;
+		font-display: block;
+	}
+</style>
+<div id="root"></div>
+
+<!-- Map the bundle's externalised react imports to an inert stub (core uses no React at runtime). -->
+<script type="importmap">
+	{ "imports": { "react": "/scripts/capture/react-stub.js", "react/jsx-runtime": "/scripts/capture/react-stub.js" } }
+</script>
+
+<script type="module">
+	import { createThreadText } from "/dist/index.js"
+
+	const root = document.getElementById("root")
+	let instances = []
+
+	/** Tear down any live instances and clear the stage. */
+	function reset() {
+		instances.forEach((i) => i.destroy())
+		instances = []
+		root.innerHTML = ""
+	}
+
+	/** True once a host's canvas has actually drawn non-transparent pixels. */
+	function hasContent(host) {
+		const cvs = host.querySelectorAll("canvas")
+		for (const c of cvs) {
+			if (!c.width || !c.height) continue
+			const ctx = c.getContext("2d")
+			try {
+				const { data } = ctx.getImageData(0, 0, c.width, c.height)
+				for (let i = 3; i < data.length; i += 4) if (data[i] > 8) return true
+			} catch { /* tainted — treat as drawn */ return true }
+		}
+		return false
+	}
+
+	/** Poll until every host in the stage has drawn, or timeout. */
+	window.waitDrawn = (timeout = 6000) => new Promise((resolve) => {
+		const t0 = performance.now()
+		const tick = () => {
+			const hosts = [...root.querySelectorAll(".host")]
+			const done = hosts.length > 0 && hosts.every(hasContent)
+			if (done || performance.now() - t0 > timeout) return resolve(done)
+			requestAnimationFrame(tick)
+		}
+		tick()
+	})
+
+	/** Build one host element under a parent, return the host. */
+	function makeHost(parent, extraClass) {
+		const h = document.createElement("div")
+		h.className = "host" + (extraClass ? " " + extraClass : "")
+		parent.appendChild(h)
+		return h
+	}
+
+	/**
+	 * Render a scene. `opts.layout` selects the arrangement:
+	 *  - "single": one big host (hero).
+	 *  - "grid":   a 2-col grid of { caption, options } cells (stitch modes / sew styles).
+	 * `opts.animate` renders the finished piece in one frame when false.
+	 * Returns the primary instance (for animated frame capture).
+	 */
+	window.mount = async (opts) => {
+		reset()
+		await document.fonts.ready
+
+		const stage = document.createElement("div")
+		stage.className = "stage pad " + (opts.layout === "grid" ? "" : "")
+		root.appendChild(stage)
+
+		if (opts.layout === "grid") {
+			const grid = document.createElement("div")
+			grid.className = "grid"
+			stage.appendChild(grid)
+			for (const cell of opts.cells) {
+				const wrap = document.createElement("div")
+				wrap.className = "cell"
+				const cap = document.createElement("div")
+				cap.className = "cap"
+				cap.textContent = cell.caption
+				wrap.appendChild(cap)
+				const host = makeHost(wrap)
+				grid.appendChild(wrap)
+				instances.push(createThreadText(host, { animate: false, ...opts.common, ...cell.options }))
+			}
+			await document.fonts.ready
+			return instances[0]
+		}
+
+		// single
+		const host = makeHost(stage)
+		const inst = createThreadText(host, { ...opts.common, ...opts.options })
+		instances.push(inst)
+		return inst
+	}
+
+	window.__ready = true
+</script>

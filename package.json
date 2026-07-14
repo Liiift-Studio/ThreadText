@@ -22,6 +22,7 @@
 		"test": "vitest",
 		"test:run": "vitest run",
 		"lint": "tsc --noEmit",
+		"capture": "node scripts/capture/capture.mjs",
 		"demo": "python3 -m http.server 8080",
 		"prepublishOnly": "npm run test:run && npm run build && npm run build:webflow"
 	},
@@ -43,6 +44,7 @@
 		"@vitejs/plugin-react": "^4.0.0",
 		"happy-dom": "^20.10.6",
 		"next": "16.2.2",
+		"playwright": "^1.61.1",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0",
 		"typescript": "^5.0.0",
