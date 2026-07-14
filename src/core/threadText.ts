@@ -483,12 +483,18 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			list.push({ x: px, y: py, ang, idx: Math.min(19, Math.max(0, Math.round((b / 1.12) * 19))) })
 			if (px < minX) minX = px; if (px > maxX) maxX = px
 		}
-		// Assign a palette entry per stitch. twotone: alternate colours in bands running across each
-		// stroke (perpendicular to the thread) → two threads packed side by side. gradient: quantise
-		// the word's horizontal position to the interpolated stops. solid: entry 0.
+		// Assign a palette entry per stitch. twotone alternates the two colours — but how depends on
+		// the stitch: satin is a continuous fill, so alternate in bands of threads packed across each
+		// stroke; the discrete modes (cross/chain/running) are individual stitches, so alternate each
+		// one (a checker on the sampling grid) → every X / link / dash is a single solid colour.
+		// gradient quantises the word's horizontal position to the interpolated stops. solid: entry 0.
 		if (colorMode === 'twotone') {
-			const bandW = Math.max(4, PITCH * 1.6)
-			for (const s of list) { const proj = -Math.sin(s.ang) * s.x + Math.cos(s.ang) * s.y; s.pal = (Math.floor(proj / bandW) & 1) }
+			if (stitchMode === 'satin') {
+				const bandW = Math.max(4, PITCH * 1.6)
+				for (const s of list) { const proj = -Math.sin(s.ang) * s.x + Math.cos(s.ang) * s.y; s.pal = (Math.floor(proj / bandW) & 1) }
+			} else {
+				for (const s of list) s.pal = ((Math.round(s.x / STEP) + Math.round(s.y / STEP)) & 1)
+			}
 		} else if (colorMode === 'gradient') {
 			const span = Math.max(1, maxX - minX)
 			for (const s of list) s.pal = Math.min(GRADIENT_STOPS - 1, Math.max(0, Math.round(((s.x - minX) / span) * (GRADIENT_STOPS - 1))))
@@ -618,7 +624,19 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	function startReveal(): void {
 		resetBg()
 		if (REDUCED || !animate) { drawAll(); anim.on = false; return }
-		const rows = sewStyle === 'hand' ? buildHandOrder(STITCHES) : buildSewRows(STITCHES)
+		const order = sewStyle === 'hand' ? buildHandOrder : buildSewRows
+		// Sew one floss colour at a time, like real embroidery: for two-tone, all of colour 0 then
+		// colour 1; for gradient, march band 0 → N across the word so the colour progresses as it sews.
+		// Solid keeps the plain spatial order.
+		let rows: Stitch[][]
+		if (colorMode === 'solid' || PALETTE.length <= 1) {
+			rows = order(STITCHES)
+		} else {
+			rows = []
+			const byPal = new Map<number, Stitch[]>()
+			for (const s of STITCHES) { const p = s.pal || 0; const a = byPal.get(p); if (a) a.push(s); else byPal.set(p, [s]) }
+			for (const p of [...byPal.keys()].sort((a, b) => a - b)) for (const r of order(byPal.get(p)!)) rows.push(r)
+		}
 		// Backstitch is a finishing pass — sew it in last, in a handful of chunks along the boundary.
 		if (OUTLINE.length) {
 			const chunks = 24, per = Math.ceil(OUTLINE.length / chunks)
