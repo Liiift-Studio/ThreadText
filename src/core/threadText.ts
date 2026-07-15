@@ -181,6 +181,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let font = opts.font ?? 'Georgia, serif'
 	let weight = clamp(opts.weight ?? 680, 1, 1000)
 	let fill = clamp(opts.fill ?? 0.9, 0.05, 1)
+	let align: 'left' | 'center' | 'right' = opts.align === 'left' || opts.align === 'right' ? opts.align : 'center'
 	let sewRate = Math.max(1, opts.sewRate ?? 110)
 	let sewStyle: 'machine' | 'hand' = opts.sewStyle === 'hand' ? 'hand' : 'machine'
 	const STITCH_MODES = ['satin', 'cross', 'chain', 'running'] as const
@@ -333,7 +334,10 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		W = Math.max(1, Math.round(cssW * scale))
 		H = Math.max(1, Math.round(cssH * scale))
 		FS = Math.max(4, Math.round(fsCss * scale))
-		ANCHOR_X = Math.round(W / 2 - (refWfs * scale) / 2)
+		// Place the word per `align`; a small pad keeps edge threads (which spill past the glyph
+		// outline by half a thread width) off the canvas edge.
+		const wordW = refWfs * scale, pad = Math.max(2, Math.round(FS * 0.08))
+		ANCHOR_X = Math.round(align === 'left' ? pad : align === 'right' ? W - wordW - pad : W / 2 - wordW / 2)
 
 		for (const c of [bgC, fxC]) { c.width = W; c.height = H; c.style.height = cssH + 'px' }
 		container.style.height = cssH + 'px'
@@ -908,6 +912,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			if (partial.font !== undefined && partial.font !== font) { font = partial.font; primaryFamily = primaryOf(font); geom = true }
 			if (partial.weight !== undefined) { const w = clamp(partial.weight, 1, 1000); if (w !== weight) { weight = w; geom = true } }
 			if (partial.fill !== undefined) { const f = clamp(partial.fill, 0.05, 1); if (f !== fill) { fill = f; geom = true } }
+			if (partial.align !== undefined) { const a = partial.align === 'left' || partial.align === 'right' ? partial.align : 'center'; if (a !== align) { align = a; geom = true } }
 			if (partial.pitch !== undefined && partial.pitch !== pitchOpt) { pitchOpt = partial.pitch; geom = true }
 			if (partial.axes !== undefined) { axes = partial.axes; geom = true }
 			if (partial.threadColor !== undefined && partial.threadColor !== threadColor1) { threadColor1 = partial.threadColor; recolor = true }

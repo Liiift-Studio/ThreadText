@@ -33,6 +33,7 @@ const INSTANCES = new WeakMap<HTMLElement, Instance>()
  *   data-tt-outline-color — backstitch outline colour
  *   data-tt-pitch         — thread spacing in px
  *   data-tt-fill          — fraction of the width the word fills (its size)
+ *   data-tt-align         — "left" | "center" | "right" (default "center")
  *   data-tt-sew-style     — "hand" for a single-thread hand look (default "machine")
  *   data-tt-stitch-mode   — "satin" | "cross" | "chain" | "running" (default "satin")
  *   data-tt-axes          — variable-font axes as JSON, e.g. '{"opsz":40,"SOFT":60}'
@@ -57,6 +58,7 @@ function readOptions(el: HTMLElement, fallbackText: string): ThreadTextOptions {
 	if (d.ttOutlineColor) opts.outlineColor = d.ttOutlineColor
 	if (d.ttPitch !== undefined) { const n = parseFloat(d.ttPitch); if (!isNaN(n)) opts.pitch = n }
 	if (d.ttFill !== undefined) { const n = parseFloat(d.ttFill); if (!isNaN(n)) opts.fill = n }
+	if (d.ttAlign && ['left', 'center', 'right'].includes(d.ttAlign)) opts.align = d.ttAlign as ThreadTextOptions['align']
 	if (d.ttSewStyle === 'hand') opts.sewStyle = 'hand'
 	if (d.ttStitchMode && ['satin', 'cross', 'chain', 'running'].includes(d.ttStitchMode)) opts.stitchMode = d.ttStitchMode as ThreadTextOptions['stitchMode']
 	if (d.ttAxes) { try { const a = JSON.parse(d.ttAxes); if (a && typeof a === 'object') opts.axes = a } catch { /* ignore malformed JSON */ } }

@@ -52,7 +52,7 @@ export default function Demo() {
 	const [text, setText] = useState("Thread")
 	const [font, setFont] = useState(DEFAULT_FONT)
 	const [weight, setWeight] = useState(680)
-	const [fill, setFill] = useState(0.9)
+	const [fill, setFill] = useState(0.62)
 	const [sewRate, setSewRate] = useState(140)
 	const [threadColor, setThreadColor] = useState("#fdf3df")
 	const [colorMode, setColorMode] = useState<'solid' | 'twotone' | 'gradient'>('solid')
@@ -67,7 +67,7 @@ export default function Demo() {
 	// Only surface the Optical control on faces that ship an opsz axis (else it's a no-op).
 	const fontHasOpsz = FONTS.find(f => f.value === font)?.opsz ?? false
 
-	const initial = useRef({ text, font, weight, fill, sewRate, threadColor, colorMode, threadColor2, backstitch, outlineColor, sheen, sewStyle, stitchMode, axes: { opsz } })
+	const initial = useRef({ text, font, weight, fill, align: 'left' as const, sewRate, threadColor, colorMode, threadColor2, backstitch, outlineColor, sheen, sewStyle, stitchMode, axes: { opsz } })
 
 	// Create once; everything below is applied live.
 	useEffect(() => {

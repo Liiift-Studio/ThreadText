@@ -56,6 +56,11 @@ export interface ThreadTextOptions {
 	 * horizontal padding. Range ~0.3–1. (default: 0.9)
 	 */
 	fill?: number
+	/**
+	 * Horizontal alignment of the word within the canvas when `fill` leaves spare width.
+	 * `'center'` (default) · `'left'` · `'right'`.
+	 */
+	align?: 'left' | 'center' | 'right'
 	/** Play the sew-in animation on mount and on `replay()`. (default: true) */
 	animate?: boolean
 	/**

@@ -8,7 +8,7 @@
 import { useEffect, useRef } from "react"
 import { addPropertyControls, ControlType, RenderTarget } from "framer"
 // Pin to a published version so shared instances stay stable. Bump when the core changes.
-import { createThreadText } from "https://esm.sh/@liiift-studio/threadtext@0.4.3"
+import { createThreadText } from "https://esm.sh/@liiift-studio/threadtext@0.4.4"
 
 /** Props surfaced to the Framer UI via addPropertyControls.
  *  Option fields are declared explicitly so the component needs no type import over HTTP. */
@@ -31,6 +31,8 @@ interface ThreadTextFramerProps {
 	outlineColor: string
 	/** Fraction of the width the word spans (its size). */
 	fill: number
+	/** Horizontal alignment of the word within the canvas. */
+	align: "left" | "center" | "right"
 	/** Sew-in style: 'machine' satin rows, or 'hand' single-thread. */
 	sewStyle: "machine" | "hand"
 	/** Stitch texture: satin / cross / chain / running. */
@@ -62,6 +64,7 @@ export default function ThreadText(props: Partial<ThreadTextFramerProps>) {
 		backstitch = false,
 		outlineColor = "#3a2410",
 		fill = 0.9,
+		align = "center",
 		sewStyle = "machine",
 		stitchMode = "satin",
 		opsz = 40,
@@ -81,13 +84,13 @@ export default function ThreadText(props: Partial<ThreadTextFramerProps>) {
 	useEffect(() => {
 		const el = ref.current
 		if (!el) return
-		const instance = createThreadText(el, { text, font: fontFamily, weight, threadColor, threadColor2, colorMode, backstitch, outlineColor, fill, sewStyle, stitchMode, axes: { opsz }, sewRate, sheen: live ? sheen : false, animate: live ? animate : false })
+		const instance = createThreadText(el, { text, font: fontFamily, weight, threadColor, threadColor2, colorMode, backstitch, outlineColor, fill, align, sewStyle, stitchMode, axes: { opsz }, sewRate, sheen: live ? sheen : false, animate: live ? animate : false })
 		instRef.current = instance
 		return () => instance.destroy()
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [live])
 
-	useEffect(() => { instRef.current?.update({ font: fontFamily, weight, threadColor, threadColor2, colorMode, backstitch, outlineColor, fill, sewStyle, stitchMode, axes: { opsz }, sewRate, sheen: live ? sheen : false, animate: live ? animate : false }) }, [fontFamily, weight, threadColor, threadColor2, colorMode, backstitch, outlineColor, fill, sewStyle, stitchMode, opsz, sewRate, sheen, animate, live])
+	useEffect(() => { instRef.current?.update({ font: fontFamily, weight, threadColor, threadColor2, colorMode, backstitch, outlineColor, fill, align, sewStyle, stitchMode, axes: { opsz }, sewRate, sheen: live ? sheen : false, animate: live ? animate : false }) }, [fontFamily, weight, threadColor, threadColor2, colorMode, backstitch, outlineColor, fill, align, sewStyle, stitchMode, opsz, sewRate, sheen, animate, live])
 	useEffect(() => { instRef.current?.setText(text) }, [text])
 
 	return <div ref={ref} style={{ width: "100%" }} role="img" aria-label={text} />
@@ -104,6 +107,7 @@ addPropertyControls(ThreadText, {
 	backstitch: { type: ControlType.Boolean, title: "Backstitch", defaultValue: false },
 	outlineColor: { type: ControlType.Color, title: "Outline", defaultValue: "#3a2410", hidden: (p) => !p.backstitch },
 	fill: { type: ControlType.Number, title: "Size", defaultValue: 0.9, min: 0.3, max: 1, step: 0.02, description: "Fraction of the width the word fills." },
+	align: { type: ControlType.Enum, title: "Align", options: ["left", "center", "right"], optionTitles: ["Left", "Center", "Right"], defaultValue: "center" },
 	sewStyle: { type: ControlType.Enum, title: "Sew style", options: ["machine", "hand"], optionTitles: ["Machine", "Hand"], defaultValue: "machine" },
 	stitchMode: { type: ControlType.Enum, title: "Stitch", options: ["satin", "cross", "chain", "running"], optionTitles: ["Satin", "Cross", "Chain", "Running"], defaultValue: "satin" },
 	opsz: { type: ControlType.Number, title: "Optical", defaultValue: 40, min: 9, max: 144, step: 1, description: "Optical size (opsz) on fonts that have it." },

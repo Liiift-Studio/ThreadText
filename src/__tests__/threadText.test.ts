@@ -207,6 +207,16 @@ describe('createThreadText', () => {
 		expect(() => inst!.update({ backstitch: true })).not.toThrow()
 	})
 
+	it('align builds for each value and updates live without throwing', () => {
+		for (const align of ['left', 'center', 'right'] as const) {
+			const i = createThreadText(host, { text: 'Al', align })
+			expect(host.querySelectorAll('canvas').length).toBeGreaterThanOrEqual(2)
+			i.destroy()
+		}
+		inst = createThreadText(host, { text: 'Al', align: 'center' })
+		expect(() => inst!.update({ align: 'left' })).not.toThrow()
+	})
+
 	it('reduced-motion draws instantly and still renders', () => {
 		inst = createThreadText(host, { text: 'Calm', reducedMotion: true })
 		expect(host.querySelectorAll('canvas').length).toBe(2)

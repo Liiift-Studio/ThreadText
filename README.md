@@ -109,7 +109,7 @@ function Stitched() {
      data-tt-sew-style="machine"></div>
 ```
 
-The bundle auto-initialises every `[data-threadtext]` element and exposes a small `window.ThreadText` API for manual control. Supported attributes: `data-tt-text`, `data-tt-font`, `data-tt-weight`, `data-tt-thread-color`, `data-tt-thread-color2`, `data-tt-color-mode`, `data-tt-backstitch`, `data-tt-outline-color`, `data-tt-fill`, `data-tt-pitch`, `data-tt-stitch-mode`, `data-tt-sew-style`, `data-tt-sew-rate`, `data-tt-sheen`, `data-tt-animate`, `data-tt-editable`, `data-tt-axes` (JSON).
+The bundle auto-initialises every `[data-threadtext]` element and exposes a small `window.ThreadText` API for manual control. Supported attributes: `data-tt-text`, `data-tt-font`, `data-tt-weight`, `data-tt-thread-color`, `data-tt-thread-color2`, `data-tt-color-mode`, `data-tt-backstitch`, `data-tt-outline-color`, `data-tt-fill`, `data-tt-align`, `data-tt-pitch`, `data-tt-stitch-mode`, `data-tt-sew-style`, `data-tt-sew-rate`, `data-tt-sheen`, `data-tt-animate`, `data-tt-editable`, `data-tt-axes` (JSON).
 
 ---
 
@@ -125,6 +125,7 @@ All fields on `ThreadTextOptions`. Most can be changed live with `instance.updat
 - **`colorMode`** — `'solid'` (default) · `'twotone'` (two colours as alternating threads packed side by side) · `'gradient'` (a smooth colour transition across the word). `'twotone'`/`'gradient'` use **`threadColor2`** as the second colour.
 - **`backstitch`** — add a darker running-stitch **outline** traced around each glyph (sews in last); **`outlineColor`** sets its colour (defaults to a darkened `threadColor`).
 - **`fill`** — size: the fraction of the container width the word spans (it re-fits on load/resize).
+- **`align`** — horizontal placement of the word in the canvas when `fill` leaves spare width: `'center'` (default) · `'left'` · `'right'`.
 - **`pitch`** — thread spacing (how tightly the stitches are packed across each stroke).
 - **`stitchMode`** — `'satin'` · `'cross'` · `'chain'` · `'running'` textures (below).
 - **`sewStyle`** — `'machine'` (satin rows in parallel) or `'hand'` (one letter at a time, widest threads near the top first, thin edges last).
