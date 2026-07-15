@@ -52,7 +52,7 @@ export default function Demo() {
 	const [text, setText] = useState("Thread")
 	const [font, setFont] = useState(DEFAULT_FONT)
 	const [weight, setWeight] = useState(680)
-	const [fill, setFill] = useState(0.62)
+	const [fill, setFill] = useState(0.8)
 	const [sewRate, setSewRate] = useState(140)
 	const [threadColor, setThreadColor] = useState("#fdf3df")
 	const [colorMode, setColorMode] = useState<'solid' | 'twotone' | 'gradient'>('solid')
