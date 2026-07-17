@@ -629,17 +629,21 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		resetBg()
 		if (REDUCED || !animate) { drawAll(); anim.on = false; return }
 		const order = sewStyle === 'hand' ? buildHandOrder : buildSewRows
-		// Sew one floss colour at a time, like real embroidery: for two-tone, all of colour 0 then
-		// colour 1; for gradient, march band 0 → N across the word so the colour progresses as it sews.
-		// Solid keeps the plain spatial order.
+		// Sew order by colour mode:
+		//  • gradient — march the colour bands in order (0 → N, left → right) so the colour progresses
+		//    as it sews. Its bands are separate x-regions, so grouping never hides one under another.
+		//  • two-tone — sew SPATIALLY so both colours build up together, like one needle pulling two
+		//    colours. Grouping by colour here would lay the second colour last, and where stitches
+		//    overlap (the discrete cross/chain/running fills especially) it would just cover the first.
+		//  • solid — plain spatial order.
 		let rows: Stitch[][]
-		if (colorMode === 'solid' || PALETTE.length <= 1) {
-			rows = order(STITCHES)
-		} else {
+		if (colorMode === 'gradient' && PALETTE.length > 1) {
 			rows = []
 			const byPal = new Map<number, Stitch[]>()
 			for (const s of STITCHES) { const p = s.pal || 0; const a = byPal.get(p); if (a) a.push(s); else byPal.set(p, [s]) }
 			for (const p of [...byPal.keys()].sort((a, b) => a - b)) for (const r of order(byPal.get(p)!)) rows.push(r)
+		} else {
+			rows = order(STITCHES)
 		}
 		// Backstitch is a finishing pass — sew it in last, in a handful of chunks along the boundary.
 		if (OUTLINE.length) {
