@@ -8,7 +8,7 @@
 import { useEffect, useRef } from "react"
 import { addPropertyControls, ControlType, RenderTarget } from "framer"
 // Pin to a published version so shared instances stay stable. Bump when the core changes.
-import { createThreadText } from "https://esm.sh/@liiift-studio/threadtext@0.4.5"
+import { createThreadText } from "https://esm.sh/@liiift-studio/threadtext@0.4.6"
 
 /** Props surfaced to the Framer UI via addPropertyControls.
  *  Option fields are declared explicitly so the component needs no type import over HTTP. */

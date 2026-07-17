@@ -287,7 +287,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	let MASKCV: HTMLCanvasElement | null = null
 	let OFFCV: HTMLCanvasElement | null = null
 	let OFFCTX: CanvasRenderingContext2D | null = null
-	let STITCHES: Stitch[] = [], OUTLINE: Stitch[] = [], STEP_G = 3
+	let STITCHES: Stitch[] = [], OUTLINE: Stitch[] = [], BLEND: Stitch[] = [], STEP_G = 3   // BLEND: gradient smoothing overlay (2nd layer)
 
 	const anim = { rows: [] as Stitch[][], idx: 0, acc: 0, rate: 0, on: false }
 	const sheen = { x: 0, y: 0, set: false }
@@ -473,7 +473,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 	// ── stitch list: sample the mask on a jittered grid ──
 	function buildStitchList(): void {
 		const STEP = Math.max(1.6, PITCH * 0.6); STEP_G = STEP
-		const list: Stitch[] = []
+		const list: Stitch[] = [], blend: Stitch[] = []
 		let minX = Infinity, maxX = -Infinity
 		for (let y = 0; y < H; y += STEP) for (let x = 0; x < W; x += STEP) {
 			const jx = (hash2(Math.floor(x), Math.floor(y)) - 0.5) * STEP * 0.9
@@ -501,9 +501,20 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			}
 		} else if (colorMode === 'gradient') {
 			const span = Math.max(1, maxX - minX)
-			for (const s of list) s.pal = Math.min(GRADIENT_STOPS - 1, Math.max(0, Math.round(((s.x - minX) / span) * (GRADIENT_STOPS - 1))))
+			for (const s of list) {
+				const t = ((s.x - minX) / span) * (GRADIENT_STOPS - 1)
+				const lo = Math.min(GRADIENT_STOPS - 1, Math.max(0, Math.floor(t)))
+				s.pal = lo
+				// Second, overlapping layer (needle-painting): probabilistically lay the NEXT stop's
+				// colour on top, with density ramping 0→1 across each band, so the seam between two
+				// stops dissolves into a smooth blend. Sewn after the base layer (see startReveal).
+				if (lo < GRADIENT_STOPS - 1 && hash2(s.x * 3 + 1, s.y * 5 + 2) < t - lo) {
+					blend.push({ x: s.x, y: s.y, ang: s.ang, idx: s.idx, pal: lo + 1 })
+				}
+			}
 		}
 		STITCHES = list
+		BLEND = blend
 		buildOutlineList()
 	}
 
@@ -537,7 +548,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		else { c.rotate(s.ang + spriteAngOffset); c.drawImage(SPRITES[(s.pal || 0) * 20 + s.idx], -SPRITE_W / 2, -SPRITE_H / 2) }
 		c.restore()
 	}
-	function drawAll(): void { const c = bgC.getContext('2d'); if (!c) return; for (const s of STITCHES) drawStitch(c, s); for (const s of OUTLINE) drawStitch(c, s) }
+	function drawAll(): void { const c = bgC.getContext('2d'); if (!c) return; for (const s of STITCHES) drawStitch(c, s); for (const s of BLEND) drawStitch(c, s); for (const s of OUTLINE) drawStitch(c, s) }
 	/** Clear the base canvas to transparent (no fabric, no contact shadow). */
 	function resetBg(): void {
 		const c = bgC.getContext('2d'); if (!c) return
@@ -645,6 +656,9 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 		} else {
 			rows = order(STITCHES)
 		}
+		// Gradient smoothing pass: once the base layer is down, feather the seams with the overlapping
+		// second layer (the neighbouring-stop colour), sewn on top.
+		if (BLEND.length) for (const r of order(BLEND)) rows.push(r)
 		// Backstitch is a finishing pass — sew it in last, in a handful of chunks along the boundary.
 		if (OUTLINE.length) {
 			const chunks = 24, per = Math.ceil(OUTLINE.length / chunks)
@@ -954,7 +968,7 @@ export function createThreadText(target: HTMLElement, opts: ThreadTextOptions): 
 			container.removeEventListener('pointermove', onPointerMove)
 			container.removeEventListener('pointerleave', onPointerLeave)
 			for (const c of created) c.remove()
-			SPRITES = []; OUTLINE_SPRITES = []; STITCHES = []; OUTLINE = []; anim.rows = []
+			SPRITES = []; OUTLINE_SPRITES = []; STITCHES = []; OUTLINE = []; BLEND = []; anim.rows = []
 			MASK = new Uint8Array(0); SHADE = new Float32Array(0)
 			EX = new Float32Array(0); EY = new Float32Array(0)
 			MASKCV = OFFCV = null; OFFCTX = null; caretEl = null; editInput = null
