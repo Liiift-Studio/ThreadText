@@ -129,7 +129,7 @@ thread.destroy()          // cancel rAF, remove listeners, free canvases`} />
 									<th scope="col" className="pb-2 font-normal">Description</th>
 								</tr>
 							</thead>
-							<tbody className="text-muted zebra-bleed">
+							<tbody className="text-muted zebra">
 								<tr className="hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">text</td><td className="py-2 pr-6">—</td><td className="py-2">The word (or short phrase) to embroider. Required.</td></tr>
 								<tr className="hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">font</td><td className="py-2 pr-6">&apos;Georgia, serif&apos;</td><td className="py-2">CSS font-family of an already-loaded font. The glyph geometry drives the stitch flow — load it however you like before calling.</td></tr>
 								<tr className="hover:bg-foreground/5 transition-colors"><td className="py-2 pr-6 font-mono">weight</td><td className="py-2 pr-6">680</td><td className="py-2">Numeric font weight (100–900). Drives the wght axis via the standard font shorthand.</td></tr>
