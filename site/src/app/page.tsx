@@ -29,7 +29,7 @@ export default function Home() {
 			{/* Hero */}
 			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-6">
 				<div className="flex flex-col gap-2">
-					<p className="text-xs uppercase tracking-[0.18em] font-medium text-muted">threadtext</p>
+					<p className="text-xs uppercase tracking-[0.18em] font-medium text-muted">embroidered text rendering</p>
 					<h1 className="text-4xl lg:text-8xl xl:text-9xl" style={{ fontFamily: "var(--font-merriweather), serif", fontVariationSettings: '"wght" 360, "opsz" 144', lineHeight: "1.05em" }}>
 						Text,<br />
 						<span style={{ color: "var(--foreground-subtle)", fontStyle: "italic", fontVariationSettings: '"wght" 300, "opsz" 144' }}>embroidered.</span>
