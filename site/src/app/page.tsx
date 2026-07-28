@@ -1,7 +1,6 @@
 // threadText landing page — procedural satin-stitch embroidery tool site
 import Demo from "@/components/Demo"
-import { MagnetChar } from "@liiift-studio/magnettype"
-import CopyInstall from "@/components/CopyInstall"
+import Hero from "@/components/Hero"
 import CodeBlock from "@/components/CodeBlock"
 import { version } from "../../../package.json"
 import { version as siteVersion } from "../../package.json"
@@ -28,33 +27,18 @@ export default function Home() {
 		<main className="flex flex-col items-center px-6 py-20 gap-24">
 
 			{/* Hero */}
-			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-6">
-				<div className="flex flex-col gap-2">
-					<p className="text-xs uppercase tracking-[0.18em] font-medium text-muted">embroidered text rendering</p>
-					<h1 className="text-4xl lg:text-8xl xl:text-9xl" style={{ fontFamily: "var(--font-merriweather), serif", fontVariationSettings: '"wght" 360, "opsz" 144', lineHeight: "1.05em" }}>
-						<MagnetChar as="span" minWeight={300} maxWeight={800} spreadRadius={220} fixedAxes={{ opsz: 144 }}>Text,</MagnetChar><br />
-						<MagnetChar as="span" minWeight={300} maxWeight={800} spreadRadius={220} fixedAxes={{ opsz: 144 }} style={{ color: "var(--foreground-subtle)", fontStyle: "italic" }}>embroidered.</MagnetChar>
-					</h1>
-				</div>
-				<div className="flex flex-wrap items-center gap-4">
-					<CopyInstall />
-					<a
-						href="https://github.com/Liiift-Studio/ThreadText"
-						target="_blank"
-						rel="noopener noreferrer"
-						aria-label="ThreadText on GitHub (opens in new tab)"
-						className="text-sm text-muted hover:text-foreground transition-colors"
-					>
-						GitHub ↗
-					</a>
-				</div>
-				<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted tracking-wide">
-					<span>TypeScript</span><span aria-hidden="true">·</span><span>Zero dependencies</span><span aria-hidden="true">·</span><span>React + Vanilla JS</span>
-				</div>
+			<Hero
+				eyebrow="embroidered text rendering"
+				title={[{ text: "Text," }, { text: "embroidered.", italic: true, subtle: true }]}
+				titleWeight={360}
+				install="@liiift-studio/threadtext"
+				github="https://github.com/Liiift-Studio/ThreadText"
+				tech={["TypeScript", "Zero dependencies", "React + Vanilla JS"]}
+			>
 				<p className="text-base leading-relaxed max-w-lg">
 					Give it a word in any loaded font and it renders as raised satin floss on a transparent ground — threads that run <em>across</em> each stroke and fan around the curves, lifted into 3D and sewn in one satin stitch at a time. Drop it over any background. Photorealistic <em>by construction</em>, from the font&rsquo;s real glyph geometry — not a raster filter, not an AI image.
 				</p>
-			</section>
+			</Hero>
 
 			{/* Demo */}
 			<section className="w-full max-w-2xl lg:max-w-5xl flex flex-col gap-4">
