@@ -35,7 +35,7 @@ export default function Home() {
 						<span style={{ color: "var(--foreground-subtle)", fontStyle: "italic", fontVariationSettings: '"wght" 300, "opsz" 144' }}>embroidered.</span>
 					</h1>
 				</div>
-				<div className="flex items-center gap-4">
+				<div className="flex flex-wrap items-center gap-4">
 					<CopyInstall />
 					<a
 						href="https://github.com/Liiift-Studio/ThreadText"
