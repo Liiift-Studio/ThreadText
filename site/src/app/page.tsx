@@ -1,5 +1,6 @@
 // threadText landing page — procedural satin-stitch embroidery tool site
 import Demo from "@/components/Demo"
+import { MagnetChar } from "@liiift-studio/magnettype"
 import CopyInstall from "@/components/CopyInstall"
 import CodeBlock from "@/components/CodeBlock"
 import { version } from "../../../package.json"
@@ -31,8 +32,8 @@ export default function Home() {
 				<div className="flex flex-col gap-2">
 					<p className="text-xs uppercase tracking-[0.18em] font-medium text-muted">embroidered text rendering</p>
 					<h1 className="text-4xl lg:text-8xl xl:text-9xl" style={{ fontFamily: "var(--font-merriweather), serif", fontVariationSettings: '"wght" 360, "opsz" 144', lineHeight: "1.05em" }}>
-						Text,<br />
-						<span style={{ color: "var(--foreground-subtle)", fontStyle: "italic", fontVariationSettings: '"wght" 300, "opsz" 144' }}>embroidered.</span>
+						<MagnetChar as="span" minWeight={300} maxWeight={800} spreadRadius={220} fixedAxes={{ opsz: 144 }}>Text,</MagnetChar><br />
+						<MagnetChar as="span" minWeight={300} maxWeight={800} spreadRadius={220} fixedAxes={{ opsz: 144 }} style={{ color: "var(--foreground-subtle)", fontStyle: "italic" }}>embroidered.</MagnetChar>
 					</h1>
 				</div>
 				<div className="flex flex-wrap items-center gap-4">
