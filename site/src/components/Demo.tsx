@@ -96,7 +96,6 @@ export default function Demo() {
 		ro?.observe(el)
 
 		return () => { ro?.disconnect(); cancelAnimationFrame(raf); inst.destroy(); instRef.current = null }
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
 	// Defer the geometry-heavy slider values so dragging Weight/Size coalesces rebuilds
